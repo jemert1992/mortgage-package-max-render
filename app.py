@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Complete Mortgage Package Analyzer with Maximum OCR Features
-Optimized for Render.com deployment
+Mortgage Package Analyzer - Render Compatible Version
+Simplified for reliable deployment without complex OCR dependencies
 """
 
 import os
@@ -23,9 +23,6 @@ from werkzeug.utils import secure_filename
 
 # PDF processing imports
 import pdfplumber
-from pdf2image import convert_from_bytes
-import pytesseract
-from PIL import Image, ImageEnhance, ImageFilter
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -72,7 +69,7 @@ def get_progress(session_id: str) -> Dict:
         })
 
 class MortgageAnalyzer:
-    """Advanced mortgage document analyzer with maximum OCR capabilities"""
+    """Mortgage document analyzer with text-based processing"""
     
     def __init__(self):
         self.section_patterns = {
@@ -257,89 +254,6 @@ class MortgageAnalyzer:
             }
         }
     
-    def preprocess_image(self, image: Image.Image) -> List[Image.Image]:
-        """Apply multiple preprocessing techniques to improve OCR accuracy"""
-        processed_images = []
-        
-        # Original image
-        processed_images.append(image)
-        
-        # High contrast version
-        enhancer = ImageEnhance.Contrast(image)
-        high_contrast = enhancer.enhance(2.0)
-        processed_images.append(high_contrast)
-        
-        # Sharpened version
-        sharpened = image.filter(ImageFilter.SHARPEN)
-        processed_images.append(sharpened)
-        
-        # Grayscale with enhanced contrast
-        grayscale = image.convert('L')
-        enhancer = ImageEnhance.Contrast(grayscale)
-        enhanced_gray = enhancer.enhance(1.5)
-        processed_images.append(enhanced_gray)
-        
-        return processed_images
-    
-    def extract_text_with_ocr(self, pdf_bytes: bytes, session_id: str) -> Tuple[str, List[Dict]]:
-        """Extract text using multiple OCR strategies for maximum accuracy"""
-        all_text = []
-        page_details = []
-        
-        try:
-            # Convert PDF to images
-            update_progress(session_id, 1, 10, "Converting PDF to images...")
-            images = convert_from_bytes(pdf_bytes, dpi=200, fmt='PNG')
-            total_pages = len(images)
-            
-            update_progress(session_id, 2, 10, f"Processing {total_pages} pages with advanced OCR...")
-            
-            for page_num, image in enumerate(images, 1):
-                page_text_variants = []
-                
-                # Apply multiple preprocessing techniques
-                processed_images = self.preprocess_image(image)
-                
-                # Try different OCR configurations on each processed image
-                ocr_configs = [
-                    '--psm 1 --oem 3',  # Automatic page segmentation with orientation
-                    '--psm 3 --oem 3',  # Fully automatic page segmentation
-                    '--psm 6 --oem 3',  # Uniform block of text
-                    '--psm 4 --oem 3'   # Single column of text
-                ]
-                
-                for img_variant in processed_images:
-                    for config in ocr_configs:
-                        try:
-                            text = pytesseract.image_to_string(img_variant, config=config)
-                            if text.strip():
-                                page_text_variants.append(text)
-                        except Exception as e:
-                            logger.warning(f"OCR config {config} failed for page {page_num}: {e}")
-                
-                # Select the best text variant (longest with most words)
-                best_text = ""
-                if page_text_variants:
-                    best_text = max(page_text_variants, key=lambda x: len(x.split()))
-                
-                all_text.append(best_text)
-                page_details.append({
-                    'page': page_num,
-                    'text_length': len(best_text),
-                    'word_count': len(best_text.split()),
-                    'variants_tried': len(page_text_variants)
-                })
-                
-                # Update progress
-                progress = int((page_num / total_pages) * 6) + 2  # Pages 2-8 of 10
-                update_progress(session_id, progress, 10, f"OCR processing page {page_num} of {total_pages}...")
-            
-            return '\n\n'.join(all_text), page_details
-            
-        except Exception as e:
-            logger.error(f"OCR extraction failed: {e}")
-            raise Exception(f"OCR processing failed: {str(e)}")
-    
     def extract_text_with_pdfplumber(self, pdf_bytes: bytes, session_id: str) -> Tuple[str, List[Dict]]:
         """Extract text using pdfplumber for text-based PDFs"""
         all_text = []
@@ -458,30 +372,32 @@ class MortgageAnalyzer:
         try:
             update_progress(session_id, 0, 10, "Starting document analysis...")
             
-            # Try pdfplumber first (faster for text-based PDFs)
-            try:
-                text, page_details = self.extract_text_with_pdfplumber(pdf_bytes, session_id)
-                
-                # Check if we got meaningful text
-                total_words = sum(detail.get('word_count', 0) for detail in page_details)
-                if total_words < 50:  # If very little text, try OCR
-                    update_progress(session_id, 2, 10, "PDF appears to be image-based, switching to OCR...")
-                    text, page_details = self.extract_text_with_ocr(pdf_bytes, session_id)
-                    extraction_method = "OCR (image-based PDF)"
-                else:
-                    extraction_method = "pdfplumber (text-based PDF)"
-                    
-            except Exception as e:
-                logger.warning(f"pdfplumber failed, trying OCR: {e}")
-                text, page_details = self.extract_text_with_ocr(pdf_bytes, session_id)
-                extraction_method = "OCR (fallback)"
+            # Extract text using pdfplumber
+            text, page_details = self.extract_text_with_pdfplumber(pdf_bytes, session_id)
+            
+            # Check if we got meaningful text
+            total_words = sum(detail.get('word_count', 0) for detail in page_details)
+            if total_words < 50:
+                # For image-based PDFs, return a helpful message
+                return {
+                    'success': True,
+                    'extraction_method': "Text-based extraction (image PDFs require OCR upgrade)",
+                    'total_pages': len(page_details),
+                    'total_text_length': len(text),
+                    'total_words': total_words,
+                    'sections_found': 0,
+                    'sections': [],
+                    'page_details': page_details,
+                    'analysis_timestamp': datetime.now().isoformat(),
+                    'note': 'This appears to be an image-based PDF. For full OCR processing, upgrade to the advanced version.'
+                }
             
             # Analyze sections
             sections = self.analyze_sections(text, page_details, session_id)
             
             return {
                 'success': True,
-                'extraction_method': extraction_method,
+                'extraction_method': "pdfplumber (text-based PDF)",
                 'total_pages': len(page_details),
                 'total_text_length': len(text),
                 'total_words': len(text.split()),
@@ -510,7 +426,7 @@ HTML_TEMPLATE = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Complete Mortgage Package Analyzer</title>
+    <title>Mortgage Package Analyzer</title>
     <style>
         * {
             margin: 0;
@@ -780,6 +696,15 @@ HTML_TEMPLATE = """
             border-left: 4px solid #28a745;
         }
         
+        .info-message {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            border-left: 4px solid #17a2b8;
+        }
+        
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -833,8 +758,8 @@ HTML_TEMPLATE = """
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏠 Complete Mortgage Package Analyzer</h1>
-            <p>Advanced OCR-powered document analysis for mortgage packages</p>
+            <h1>🏠 Mortgage Package Analyzer</h1>
+            <p>Professional document analysis for mortgage packages</p>
         </div>
         
         <div class="main-card">
@@ -871,6 +796,10 @@ HTML_TEMPLATE = """
                 
                 <div class="stats-grid" id="statsGrid">
                     <!-- Stats will be populated here -->
+                </div>
+                
+                <div id="messageArea">
+                    <!-- Messages will be displayed here -->
                 </div>
                 
                 <div class="sections-grid" id="sectionsGrid">
@@ -1030,6 +959,9 @@ HTML_TEMPLATE = """
                 // Display stats
                 displayStats(data);
                 
+                // Display any special messages
+                displayMessages(data);
+                
                 // Display sections
                 displaySections(data.sections);
                 
@@ -1061,11 +993,24 @@ HTML_TEMPLATE = """
                 `;
             }
             
+            function displayMessages(data) {
+                const messageArea = document.getElementById('messageArea');
+                messageArea.innerHTML = '';
+                
+                if (data.note) {
+                    messageArea.innerHTML = `
+                        <div class="info-message">
+                            <strong>Note:</strong> ${data.note}
+                        </div>
+                    `;
+                }
+            }
+            
             function displaySections(sections) {
                 const sectionsGrid = document.getElementById('sectionsGrid');
                 
                 if (!sections || sections.length === 0) {
-                    sectionsGrid.innerHTML = '<div class="error-message">No mortgage sections were identified in this document.</div>';
+                    sectionsGrid.innerHTML = '<div class="info-message">No mortgage sections were identified in this document. This may be an image-based PDF that requires OCR processing.</div>';
                     return;
                 }
                 
@@ -1155,7 +1100,7 @@ HTML_TEMPLATE = """
                 }
             }
             
-            console.log('Complete Mortgage Analyzer loaded successfully!');
+            console.log('Mortgage Analyzer loaded successfully!');
         })();
     </script>
 </body>
@@ -1223,8 +1168,8 @@ def health():
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.now().isoformat(),
-        'version': '2.0.0',
-        'features': ['OCR', 'Pattern Matching', 'Progress Tracking']
+        'version': '1.0.0',
+        'features': ['Text Extraction', 'Pattern Matching', 'Progress Tracking']
     })
 
 if __name__ == '__main__':
