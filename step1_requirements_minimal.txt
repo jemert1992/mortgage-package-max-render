@@ -1,0 +1,9 @@
+# Alternative minimal requirements - only essential packages
+flask-cors
+pdfplumber
+python-docx
+openpyxl
+pillow
+pytesseract
+requests
+
