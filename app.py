@@ -718,6 +718,63 @@ def index():
             background: rgba(255, 255, 255, 0.08);
         }
 
+        .upload-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .mortgage-workflow {
+            background: rgba(255, 107, 53, 0.1);
+            border: 2px solid rgba(255, 107, 53, 0.3);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .workflow-step {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .workflow-step.completed {
+            background: rgba(0, 255, 0, 0.1);
+            border-color: #00ff00;
+        }
+
+        .workflow-step.active {
+            background: rgba(255, 107, 53, 0.1);
+            border-color: #ff6b35;
+            box-shadow: 0 0 15px rgba(255, 107, 53, 0.3);
+        }
+
+        .step-number {
+            background: #00d4ff;
+            color: #000;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .step-number.completed {
+            background: #00ff00;
+        }
+
+        .step-number.active {
+            background: #ff6b35;
+            color: white;
+        }
+
         .upload-title {
             font-size: 1.5rem;
             font-weight: 600;
@@ -880,19 +937,63 @@ def index():
             </div>
         </div>
 
-        <div class="upload-section">
-            <h3 class="upload-title">Upload Your Documents</h3>
-            <p style="color: #b0b0b0; margin-bottom: 20px;">Supports PDF, Word, Excel, Images, and Text files</p>
-            
-            <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.txt">
-            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
-                Choose Files
-            </button>
-            
-            <div id="selectedFiles"></div>
-            <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
-                🚀 Start Analysis
-            </button>
+        <div class="upload-section" id="uploadSection">
+            <!-- Mortgage Workflow Section -->
+            <div class="mortgage-workflow" id="mortgageWorkflow" style="display: none;">
+                <h3 style="color: #ff6b35; margin-bottom: 20px;">🏠 Mortgage Analysis Workflow</h3>
+                <p style="color: #b0b0b0; margin-bottom: 25px;">Follow these steps for accurate mortgage package analysis</p>
+                
+                <div class="workflow-step" id="step1">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="step-number active">1</div>
+                        <div>
+                            <strong style="color: white;">Parse Lender Requirements</strong>
+                            <div style="font-size: 0.9rem; color: #b0b0b0;">Upload or paste lender email to extract document requirements</div>
+                        </div>
+                    </div>
+                    <button onclick="showEmailParser()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">
+                        Start Here
+                    </button>
+                </div>
+                
+                <div class="workflow-step" id="step2">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="step-number">2</div>
+                        <div>
+                            <strong style="color: white;">Upload Documents</strong>
+                            <div style="font-size: 0.9rem; color: #b0b0b0;">Upload mortgage package files for analysis</div>
+                        </div>
+                    </div>
+                    <span style="color: #888; font-size: 0.9rem;">Complete Step 1 first</span>
+                </div>
+                
+                <div class="workflow-step" id="step3">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="step-number">3</div>
+                        <div>
+                            <strong style="color: white;">Analyze & Match</strong>
+                            <div style="font-size: 0.9rem; color: #b0b0b0;">Match documents against lender requirements</div>
+                        </div>
+                    </div>
+                    <span style="color: #888; font-size: 0.9rem;">Complete Steps 1-2 first</span>
+                </div>
+            </div>
+
+            <!-- Universal Upload Section -->
+            <div id="universalUpload">
+                <h3 class="upload-title">Upload Your Documents</h3>
+                <p style="color: #b0b0b0; margin-bottom: 20px;">Supports PDF, Word, Excel, Images, and Text files</p>
+                
+                <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.txt">
+                <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                    Choose Files
+                </button>
+                
+                <div id="selectedFiles"></div>
+                <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
+                    🚀 Start Analysis
+                </button>
+            </div>
             
             <div class="progress-container" id="progressContainer">
                 <div class="progress-bar">
@@ -950,6 +1051,8 @@ def index():
     <script>
         let selectedIndustry = 'mortgage';
         let selectedFiles = [];
+        let lenderRequirementsParsed = false;
+        let mortgageWorkflowStep = 1;
 
         // Industry selection
         document.querySelectorAll('.industry-card').forEach(card => {
@@ -958,12 +1061,68 @@ def index():
                 this.classList.add('selected');
                 selectedIndustry = this.dataset.industry;
                 
+                // Show/hide mortgage workflow
+                if (selectedIndustry === 'mortgage') {
+                    document.getElementById('mortgageWorkflow').style.display = 'block';
+                    document.getElementById('universalUpload').style.display = 'none';
+                    updateMortgageWorkflow();
+                } else {
+                    document.getElementById('mortgageWorkflow').style.display = 'none';
+                    document.getElementById('universalUpload').style.display = 'block';
+                }
+                
                 // Show tabs section when industry is selected
                 document.getElementById('tabsSection').style.display = 'block';
                 
                 console.log('Selected industry:', selectedIndustry);
             });
         });
+
+        // Mortgage workflow functions
+        function updateMortgageWorkflow() {
+            // Reset all steps
+            document.querySelectorAll('.workflow-step').forEach(step => {
+                step.classList.remove('active', 'completed');
+                step.querySelector('.step-number').classList.remove('active', 'completed');
+            });
+
+            // Update current step
+            for (let i = 1; i <= 3; i++) {
+                const step = document.getElementById(`step${i}`);
+                const stepNumber = step.querySelector('.step-number');
+                
+                if (i < mortgageWorkflowStep) {
+                    step.classList.add('completed');
+                    stepNumber.classList.add('completed');
+                } else if (i === mortgageWorkflowStep) {
+                    step.classList.add('active');
+                    stepNumber.classList.add('active');
+                }
+            }
+
+            // Enable/disable upload section based on workflow
+            const uploadSection = document.getElementById('universalUpload');
+            if (mortgageWorkflowStep >= 2) {
+                uploadSection.style.display = 'block';
+                uploadSection.classList.remove('disabled');
+            } else {
+                uploadSection.style.display = 'none';
+            }
+        }
+
+        function showEmailParser() {
+            // Switch to email parser tab
+            showTab('email');
+            // Scroll to tabs section
+            document.getElementById('tabsSection').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function advanceMortgageWorkflow() {
+            if (mortgageWorkflowStep < 3) {
+                mortgageWorkflowStep++;
+                updateMortgageWorkflow();
+            }
+        }
 
         // File selection
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -992,8 +1151,15 @@ def index():
             event.target.classList.add('active');
         }
 
-        // Analysis functionality
+        // Analysis functionality - enhanced for mortgage workflow
         function startAnalysis() {
+            // Check mortgage workflow requirements
+            if (selectedIndustry === 'mortgage' && !lenderRequirementsParsed) {
+                alert('Please parse lender requirements first (Step 1) before analyzing documents.');
+                showEmailParser();
+                return;
+            }
+
             if (selectedFiles.length === 0) {
                 alert('Please select files to analyze');
                 return;
@@ -1033,6 +1199,12 @@ def index():
                 setTimeout(() => {
                     progressContainer.style.display = 'none';
                     displayResults(data);
+                    
+                    // Advance mortgage workflow to step 3
+                    if (selectedIndustry === 'mortgage') {
+                        mortgageWorkflowStep = 3;
+                        updateMortgageWorkflow();
+                    }
                 }, 1000);
             })
             .catch(error => {
@@ -1103,6 +1275,24 @@ def index():
             .then(response => response.json())
             .then(data => {
                 displayEmailResults(data);
+                
+                // Advance mortgage workflow if parsing successful
+                if (selectedIndustry === 'mortgage' && data.documents && data.documents.length > 0) {
+                    lenderRequirementsParsed = true;
+                    mortgageWorkflowStep = 2;
+                    updateMortgageWorkflow();
+                    
+                    // Show success message
+                    const successMsg = document.createElement('div');
+                    successMsg.style.cssText = 'background: rgba(0,255,0,0.1); border: 1px solid #00ff00; border-radius: 10px; padding: 15px; margin: 15px 0; color: #00ff00; text-align: center;';
+                    successMsg.innerHTML = '✅ Lender requirements parsed successfully! You can now upload documents for analysis.';
+                    document.getElementById('emailResults').appendChild(successMsg);
+                    
+                    // Auto-scroll back to workflow
+                    setTimeout(() => {
+                        document.getElementById('mortgageWorkflow').scrollIntoView({ behavior: 'smooth' });
+                    }, 2000);
+                }
             })
             .catch(error => {
                 console.error('Error:', error);
