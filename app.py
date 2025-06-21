@@ -10,17 +10,31 @@ from typing import Dict, List, Any, Optional
 import io
 import base64
 
-# Free document processing libraries
+# Free document processing libraries - with graceful fallback
 try:
     import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+
+try:
     import docx
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
+try:
     from openpyxl import load_workbook
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+
+try:
     from PIL import Image
     import pytesseract
-    DEPENDENCIES_AVAILABLE = True
-except ImportError as e:
-    print(f"Missing library: {e}. Install with: pip install pdfplumber python-docx openpyxl pillow pytesseract")
-    DEPENDENCIES_AVAILABLE = False
+    OCR_AVAILABLE = True
+except ImportError:
+    OCR_AVAILABLE = False
 
 app = Flask(__name__)
 CORS(app)
@@ -29,15 +43,22 @@ class FreeDocumentProcessor:
     """Free multi-format document processor using open-source tools"""
     
     def __init__(self):
-        self.supported_formats = {
-            '.pdf': self._process_pdf,
-            '.docx': self._process_docx,
-            '.xlsx': self._process_xlsx,
-            '.txt': self._process_txt,
-            '.png': self._process_image,
-            '.jpg': self._process_image,
-            '.jpeg': self._process_image
-        }
+        self.supported_formats = {}
+        
+        # Add supported formats based on available libraries
+        if PDFPLUMBER_AVAILABLE:
+            self.supported_formats['.pdf'] = self._process_pdf
+        if DOCX_AVAILABLE:
+            self.supported_formats['.docx'] = self._process_docx
+        if OPENPYXL_AVAILABLE:
+            self.supported_formats['.xlsx'] = self._process_xlsx
+        if OCR_AVAILABLE:
+            self.supported_formats['.png'] = self._process_image
+            self.supported_formats['.jpg'] = self._process_image
+            self.supported_formats['.jpeg'] = self._process_image
+        
+        # Text files are always supported
+        self.supported_formats['.txt'] = self._process_txt
     
     def process_document(self, file_path: str, filename: str) -> Dict[str, Any]:
         """Process document and return structured data"""
@@ -76,6 +97,13 @@ class FreeDocumentProcessor:
     
     def _process_pdf(self, file_path: str, filename: str) -> Dict[str, Any]:
         """Enhanced PDF processing with pdfplumber"""
+        
+        if not PDFPLUMBER_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'PDF processing not available - pdfplumber not installed',
+                'processing_method': 'pdfplumber-unavailable'
+            }
         
         try:
             with pdfplumber.open(file_path) as pdf:
@@ -117,6 +145,13 @@ class FreeDocumentProcessor:
     
     def _process_docx(self, file_path: str, filename: str) -> Dict[str, Any]:
         """Process Word documents with python-docx"""
+        
+        if not DOCX_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'Word document processing not available - python-docx not installed',
+                'processing_method': 'python-docx-unavailable'
+            }
         
         try:
             doc = docx.Document(file_path)
@@ -164,6 +199,13 @@ class FreeDocumentProcessor:
     
     def _process_xlsx(self, file_path: str, filename: str) -> Dict[str, Any]:
         """Process Excel files with openpyxl"""
+        
+        if not OPENPYXL_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'Excel processing not available - openpyxl not installed',
+                'processing_method': 'openpyxl-unavailable'
+            }
         
         try:
             workbook = load_workbook(file_path, data_only=True)
@@ -248,6 +290,13 @@ class FreeDocumentProcessor:
     def _process_image(self, file_path: str, filename: str) -> Dict[str, Any]:
         """Process images with OCR using pytesseract"""
         
+        if not OCR_AVAILABLE:
+            return {
+                'success': False,
+                'error': 'Image OCR processing not available - PIL/pytesseract not installed',
+                'processing_method': 'pytesseract-unavailable'
+            }
+        
         try:
             # Open and preprocess image
             image = Image.open(file_path)
@@ -286,8 +335,11 @@ class FreeDocumentProcessor:
                 'processing_method': 'pytesseract-ocr'
             }
     
-    def _preprocess_image(self, image: Image.Image) -> Image.Image:
+    def _preprocess_image(self, image) -> Any:
         """Basic image preprocessing for better OCR"""
+        
+        if not OCR_AVAILABLE:
+            return image
         
         # Resize if too small (OCR works better on larger images)
         width, height = image.size
