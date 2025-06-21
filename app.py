@@ -53,6 +53,7 @@ session_data = {}
 # Industry Templates for Universal Platform
 INDUSTRY_TEMPLATES = {
     'mortgage': {
+        'id': 'mortgage',
         'name': 'Mortgage & Real Estate',
         'icon': '🏠',
         'description': 'Mortgage packages, loan documents, real estate transactions',
@@ -65,13 +66,12 @@ INDUSTRY_TEMPLATES = {
             'Multi-Party Coordination', 'Fraud Detection', 'Timeline Optimization'
         ],
         'capabilities': [
-            {'icon': '📧', 'name': 'Email Parser', 'desc': 'Extract lender requirements from emails'},
-            {'icon': '📋', 'name': 'Workflow Management', 'desc': '3-step guided process'},
-            {'icon': '✅', 'name': 'Compliance Check', 'desc': 'TRID & RESPA validation'},
-            {'icon': '🛡️', 'name': 'Fraud Detection', 'desc': 'Document authenticity verification'},
-            {'icon': '👥', 'name': 'Multi-Party Coordination', 'desc': 'Stakeholder visibility'},
-            {'icon': '⚡', 'name': 'Timeline Optimization', 'desc': 'Accelerate closing process'}
+            {'icon': '📧', 'name': 'Email Parser', 'description': 'Extract lender requirements from emails'},
+            {'icon': '📋', 'name': 'Workflow Management', 'description': '3-step guided process'},
+            {'icon': '✅', 'name': 'Compliance Check', 'description': 'TRID & RESPA validation'},
+            {'icon': '🛡️', 'name': 'Fraud Detection', 'description': 'Document authenticity verification'}
         ],
+        'performance_metric': '99%+ accuracy',
         'metrics': {
             'accuracy': '99%+',
             'speed': '90% faster',
@@ -80,6 +80,7 @@ INDUSTRY_TEMPLATES = {
         }
     },
     'real_estate': {
+        'id': 'real_estate',
         'name': 'Real Estate Transactions',
         'icon': '🏘️',
         'description': 'Property transactions, deeds, titles, purchase agreements, inspections',
@@ -93,13 +94,12 @@ INDUSTRY_TEMPLATES = {
             'Document Authenticity Verification', 'Risk Scoring', 'Timeline Acceleration'
         ],
         'capabilities': [
-            {'icon': '🛡️', 'name': 'Fraud Detection', 'desc': 'Advanced document authenticity verification'},
-            {'icon': '✅', 'name': 'Compliance Validation', 'desc': 'Regulatory requirement checking'},
-            {'icon': '📊', 'name': 'Risk Scoring', 'desc': 'Real-time fraud and compliance assessment'},
-            {'icon': '🔍', 'name': 'Document Verification', 'desc': 'Signature and alteration detection'},
-            {'icon': '👥', 'name': 'Multi-Party Dashboard', 'desc': 'Stakeholder coordination platform'},
-            {'icon': '⚡', 'name': 'Timeline Acceleration', 'desc': 'Optimize transaction speed'}
+            {'icon': '🛡️', 'name': 'Fraud Detection', 'description': 'Advanced document authenticity verification'},
+            {'icon': '✅', 'name': 'Compliance Validation', 'description': 'Regulatory requirement checking'},
+            {'icon': '📊', 'name': 'Risk Scoring', 'description': 'Real-time fraud and compliance assessment'},
+            {'icon': '⚡', 'name': 'Speed Boost', 'description': '90% faster processing'}
         ],
+        'performance_metric': '95% fraud detection',
         'metrics': {
             'fraud_detection': '95%+',
             'compliance': '100% coverage',
@@ -108,6 +108,7 @@ INDUSTRY_TEMPLATES = {
         }
     },
     'legal': {
+        'id': 'legal',
         'name': 'Legal & Law Firms',
         'icon': '⚖️',
         'description': 'Contracts, agreements, legal documents, case files',
@@ -116,13 +117,12 @@ INDUSTRY_TEMPLATES = {
             'Terms of Service', 'Privacy Policies', 'Employment Agreements', 'NDAs'
         ],
         'capabilities': [
-            {'icon': '📄', 'name': 'Contract Analysis', 'desc': 'Automated contract review and analysis'},
-            {'icon': '✅', 'name': 'Legal Compliance', 'desc': 'Regulatory and legal requirement checking'},
-            {'icon': '🔍', 'name': 'Document Review', 'desc': 'Automated legal document analysis'},
-            {'icon': '📊', 'name': 'Case Organization', 'desc': 'Intelligent case file management'},
-            {'icon': '🛡️', 'name': 'Confidentiality', 'desc': 'Secure document handling'},
-            {'icon': '⚡', 'name': 'Research Acceleration', 'desc': 'Faster legal research and review'}
+            {'icon': '📄', 'name': 'Contract Analysis', 'description': 'Automated contract review and analysis'},
+            {'icon': '✅', 'name': 'Legal Compliance', 'description': 'Regulatory and legal requirement checking'},
+            {'icon': '🔍', 'name': 'Document Review', 'description': 'Automated legal document analysis'},
+            {'icon': '📊', 'name': 'Case Organization', 'description': 'Intelligent case file management'}
         ],
+        'performance_metric': '80% faster review',
         'metrics': {
             'speed': '80% faster review',
             'compliance': 'Automated checking',
@@ -131,6 +131,7 @@ INDUSTRY_TEMPLATES = {
         }
     },
     'healthcare': {
+        'id': 'healthcare',
         'name': 'Healthcare & Medical',
         'icon': '🏥',
         'description': 'Medical records, insurance claims, patient documents',
@@ -139,13 +140,12 @@ INDUSTRY_TEMPLATES = {
             'Treatment Plans', 'Discharge Summaries', 'Consent Forms', 'Medical Bills'
         ],
         'capabilities': [
-            {'icon': '📋', 'name': 'Medical Record Analysis', 'desc': 'Comprehensive patient record review'},
-            {'icon': '💰', 'name': 'Claims Processing', 'desc': 'Automated insurance claim analysis'},
-            {'icon': '✅', 'name': 'HIPAA Compliance', 'desc': 'Healthcare privacy regulation adherence'},
-            {'icon': '🔍', 'name': 'Clinical Data Extraction', 'desc': 'Extract key medical information'},
-            {'icon': '📊', 'name': 'Treatment Analytics', 'desc': 'Patient care optimization insights'},
-            {'icon': '⚡', 'name': 'Processing Acceleration', 'desc': 'Faster medical document handling'}
+            {'icon': '📋', 'name': 'Medical Record Analysis', 'description': 'Comprehensive patient record review'},
+            {'icon': '💰', 'name': 'Claims Processing', 'description': 'Automated insurance claim analysis'},
+            {'icon': '✅', 'name': 'HIPAA Compliance', 'description': 'Healthcare privacy regulation adherence'},
+            {'icon': '🔍', 'name': 'Clinical Data Extraction', 'description': 'Extract key medical information'}
         ],
+        'performance_metric': 'HIPAA compliant',
         'metrics': {
             'compliance': 'HIPAA compliant',
             'accuracy': '95%+ extraction',
@@ -154,6 +154,7 @@ INDUSTRY_TEMPLATES = {
         }
     },
     'financial': {
+        'id': 'financial',
         'name': 'Financial Services',
         'icon': '💰',
         'description': 'Banking documents, investment reports, financial statements',
@@ -162,13 +163,12 @@ INDUSTRY_TEMPLATES = {
             'Loan Applications', 'Credit Reports', 'Insurance Policies', 'Audit Reports'
         ],
         'capabilities': [
-            {'icon': '📊', 'name': 'Financial Analysis', 'desc': 'Comprehensive financial document review'},
-            {'icon': '✅', 'name': 'Regulatory Compliance', 'desc': 'Banking and finance regulation checking'},
-            {'icon': '🔍', 'name': 'Risk Assessment', 'desc': 'Financial risk analysis and scoring'},
-            {'icon': '💳', 'name': 'Credit Analysis', 'desc': 'Automated credit evaluation'},
-            {'icon': '📋', 'name': 'Audit Support', 'desc': 'Financial audit document preparation'},
-            {'icon': '⚡', 'name': 'Processing Speed', 'desc': 'Rapid financial document analysis'}
+            {'icon': '📊', 'name': 'Financial Analysis', 'description': 'Comprehensive financial document review'},
+            {'icon': '✅', 'name': 'Regulatory Compliance', 'description': 'Banking and finance regulation checking'},
+            {'icon': '🔍', 'name': 'Risk Assessment', 'description': 'Financial risk analysis and scoring'},
+            {'icon': '💳', 'name': 'Credit Analysis', 'description': 'Automated credit evaluation'}
         ],
+        'performance_metric': 'SOX compliant',
         'metrics': {
             'compliance': 'SOX & Basel compliant',
             'accuracy': '98%+ analysis',
@@ -177,6 +177,7 @@ INDUSTRY_TEMPLATES = {
         }
     },
     'hr': {
+        'id': 'hr',
         'name': 'Human Resources',
         'icon': '👥',
         'description': 'Employee records, resumes, HR documents, onboarding',
@@ -185,13 +186,12 @@ INDUSTRY_TEMPLATES = {
             'Onboarding Documents', 'Training Records', 'Benefits Information', 'Payroll Documents'
         ],
         'capabilities': [
-            {'icon': '📄', 'name': 'Resume Analysis', 'desc': 'Automated candidate evaluation'},
-            {'icon': '✅', 'name': 'Compliance Checking', 'desc': 'HR regulation and policy adherence'},
-            {'icon': '🔍', 'name': 'Background Verification', 'desc': 'Employee background document review'},
-            {'icon': '📊', 'name': 'Performance Analytics', 'desc': 'Employee performance data analysis'},
-            {'icon': '🛡️', 'name': 'Privacy Protection', 'desc': 'Secure employee data handling'},
-            {'icon': '⚡', 'name': 'Onboarding Acceleration', 'desc': 'Faster employee onboarding process'}
+            {'icon': '📄', 'name': 'Resume Analysis', 'description': 'Automated candidate evaluation'},
+            {'icon': '✅', 'name': 'Compliance Checking', 'description': 'HR regulation and policy adherence'},
+            {'icon': '🔍', 'name': 'Background Verification', 'description': 'Employee background document review'},
+            {'icon': '📊', 'name': 'Performance Analytics', 'description': 'Employee performance data analysis'}
         ],
+        'performance_metric': '70% faster hiring',
         'metrics': {
             'speed': '70% faster hiring',
             'compliance': 'EEOC compliant',
@@ -769,6 +769,9 @@ def analyze_universal_document(text, industry, filename):
 # Routes
 @app.route('/')
 def index():
+    # Convert industry templates dict to list for template iteration
+    industries_list = list(INDUSTRY_TEMPLATES.values())
+    
     return render_template_string('''
 <!DOCTYPE html>
 <html lang="en">
@@ -1875,7 +1878,7 @@ def index():
     </script>
 </body>
 </html>
-    ''', industries=INDUSTRY_TEMPLATES)
+    ''', industries=industries_list)
 
 @app.route('/analyze', methods=['POST'])
 def analyze_documents():
