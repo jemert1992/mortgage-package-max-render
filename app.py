@@ -292,7 +292,11 @@ class EnhancedDocumentProcessor:
 document_processor = EnhancedDocumentProcessor()
 
 def parse_lender_email(content):
-    """Enhanced email parsing for lender requirements"""
+    """Enhanced email parsing for lender requirements with memory optimization"""
+    
+    # Limit content size to prevent memory issues
+    if len(content) > 50000:  # Limit to 50KB
+        content = content[:50000]
     
     # Clean the content first
     content = clean_text(content)
@@ -308,81 +312,100 @@ def parse_lender_email(content):
         'special_instructions': []
     }
     
-    # Extract lender name and contact info
-    email_patterns = [
-        r'From:\s*([^<]+)<([^>]+)>',
-        r'([A-Za-z\s]+)\s*<([^@]+@[^>]+)>',
-        r'([^@]+@[\w\.-]+\.\w+)'
-    ]
-    
-    for pattern in email_patterns:
-        match = re.search(pattern, content, re.IGNORECASE)
-        if match:
-            if len(match.groups()) >= 2:
-                lender_info['contact_name'] = match.group(1).strip()
-                lender_info['contact_email'] = match.group(2).strip()
-            else:
-                lender_info['contact_email'] = match.group(1).strip()
-            break
-    
-    # Extract lender name from email domain or content
-    if 'symmetry' in content.lower():
-        lender_info['lender_name'] = 'Symmetry Lending'
-    elif '@' in lender_info['contact_email']:
-        domain = lender_info['contact_email'].split('@')[1].split('.')[0]
-        lender_info['lender_name'] = domain.title() + ' Lending'
-    
-    # Extract funding amount
-    amount_patterns = [
-        r'\$[\d,]+\.?\d*',
-        r'amount[:\s]+\$?([\d,]+\.?\d*)',
-        r'fund[ing]*[:\s]+\$?([\d,]+\.?\d*)'
-    ]
-    
-    for pattern in amount_patterns:
-        match = re.search(pattern, content, re.IGNORECASE)
-        if match:
-            lender_info['funding_amount'] = match.group(0) if '$' in match.group(0) else f"${match.group(1)}"
-            break
-    
-    # Enhanced document extraction with checkbox patterns
-    checkbox_patterns = [
-        r'☐\s*([^\n\r]+)',
-        r'□\s*([^\n\r]+)', 
-        r'▢\s*([^\n\r]+)',
-        r'\[\s*\]\s*([^\n\r]+)',
-        r'◯\s*([^\n\r]+)',
-        r'○\s*([^\n\r]+)',
-        r'•\s*([^\n\r]+)',
-        r'-\s*([^\n\r]+)'
-    ]
-    
-    documents = set()  # Use set to avoid duplicates
-    
-    for pattern in checkbox_patterns:
-        matches = re.findall(pattern, content, re.MULTILINE)
-        for match in matches:
-            doc_name = clean_text(match.strip())
-            # Filter out non-document items
-            if (len(doc_name) > 5 and 
-                not doc_name.lower().startswith(('below', 'all ', 'guard', 'think', 'st &', '1st &')) and
-                not re.match(r'^\d+$', doc_name)):
-                documents.add(doc_name)
-    
-    # Convert to list and sort
-    lender_info['documents'] = sorted(list(documents))
-    
-    # Extract special instructions
-    instruction_patterns = [
-        r'special instructions?[:\s]*([^\n\r]+)',
-        r'note[:\s]*([^\n\r]+)',
-        r'important[:\s]*([^\n\r]+)',
-        r'deadline[:\s]*([^\n\r]+)'
-    ]
-    
-    for pattern in instruction_patterns:
-        matches = re.findall(pattern, content, re.IGNORECASE)
-        lender_info['special_instructions'].extend([clean_text(match.strip()) for match in matches])
+    try:
+        # Extract lender name and contact info
+        email_patterns = [
+            r'From:\s*([^<]+)<([^>]+)>',
+            r'([A-Za-z\s]+)\s*<([^@]+@[^>]+)>',
+            r'([^@]+@[\w\.-]+\.\w+)'
+        ]
+        
+        for pattern in email_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                if len(match.groups()) >= 2:
+                    lender_info['contact_name'] = match.group(1).strip()
+                    lender_info['contact_email'] = match.group(2).strip()
+                else:
+                    lender_info['contact_email'] = match.group(1).strip()
+                break
+        
+        # Extract lender name from email domain or content
+        if 'symmetry' in content.lower():
+            lender_info['lender_name'] = 'Symmetry Lending'
+        elif '@' in lender_info['contact_email']:
+            domain = lender_info['contact_email'].split('@')[1].split('.')[0]
+            lender_info['lender_name'] = domain.title() + ' Lending'
+        
+        # Extract funding amount
+        amount_patterns = [
+            r'\$[\d,]+\.?\d*',
+            r'amount[:\s]+\$?([\d,]+\.?\d*)',
+            r'fund[ing]*[:\s]+\$?([\d,]+\.?\d*)'
+        ]
+        
+        for pattern in amount_patterns:
+            match = re.search(pattern, content, re.IGNORECASE)
+            if match:
+                lender_info['funding_amount'] = match.group(0) if '$' in match.group(0) else f"${match.group(1)}"
+                break
+        
+        # Enhanced document extraction with checkbox patterns (limited to prevent memory issues)
+        checkbox_patterns = [
+            r'☐\s*([^\n\r]{1,200})',  # Limit match length
+            r'□\s*([^\n\r]{1,200})', 
+            r'▢\s*([^\n\r]{1,200})',
+            r'\[\s*\]\s*([^\n\r]{1,200})',
+            r'◯\s*([^\n\r]{1,200})',
+            r'○\s*([^\n\r]{1,200})',
+            r'•\s*([^\n\r]{1,200})',
+            r'-\s*([^\n\r]{1,200})'
+        ]
+        
+        documents = set()  # Use set to avoid duplicates
+        
+        for pattern in checkbox_patterns:
+            try:
+                matches = re.findall(pattern, content, re.MULTILINE)
+                for match in matches[:50]:  # Limit to 50 matches per pattern
+                    doc_name = clean_text(match.strip())
+                    # Filter out non-document items
+                    if (len(doc_name) > 5 and len(doc_name) < 200 and
+                        not doc_name.lower().startswith(('below', 'all ', 'guard', 'think', 'st &', '1st &')) and
+                        not re.match(r'^\d+$', doc_name)):
+                        documents.add(doc_name)
+                        
+                        # Limit total documents to prevent memory issues
+                        if len(documents) >= 100:
+                            break
+                            
+                if len(documents) >= 100:
+                    break
+            except Exception:
+                continue
+        
+        # Convert to list and sort
+        lender_info['documents'] = sorted(list(documents))[:50]  # Limit to 50 documents
+        
+        # Extract special instructions (limited)
+        instruction_patterns = [
+            r'special instructions?[:\s]*([^\n\r]{1,500})',
+            r'note[:\s]*([^\n\r]{1,500})',
+            r'important[:\s]*([^\n\r]{1,500})',
+            r'deadline[:\s]*([^\n\r]{1,500})'
+        ]
+        
+        for pattern in instruction_patterns:
+            try:
+                matches = re.findall(pattern, content, re.IGNORECASE)
+                lender_info['special_instructions'].extend([clean_text(match.strip()) for match in matches[:10]])  # Limit to 10 instructions
+            except Exception:
+                continue
+        
+    except Exception as e:
+        # If parsing fails, return basic info
+        lender_info['documents'] = ['Error parsing email content']
+        lender_info['special_instructions'] = [f'Parsing error: {str(e)}']
     
     return lender_info
 
