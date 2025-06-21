@@ -6,4 +6,4 @@ openpyxl
 pillow
 pytesseract
 requests
-
+gunicorn
