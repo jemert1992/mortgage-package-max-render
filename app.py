@@ -879,6 +879,10 @@ def index():
             backdrop-filter: blur(10px);
             position: relative;
             overflow: hidden;
+            height: 200px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
 
         .industry-card:hover {
@@ -887,139 +891,74 @@ def index():
             box-shadow: 0 10px 30px rgba(0,212,255,0.3);
         }
 
-        .industry-card.expanded {
-            transform: scale(1.02);
+        .industry-card.selected {
             border-color: #ff6b35;
+            background: linear-gradient(135deg, rgba(255,107,53,0.2), rgba(255,140,66,0.2));
             box-shadow: 0 15px 40px rgba(255,107,53,0.4);
         }
 
-        .capability-preview {
-            margin-top: 20px;
+        .capability-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 20, 40, 0.95), rgba(0, 40, 60, 0.95));
+            opacity: 0;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             padding: 20px;
-            background: rgba(0,0,0,0.3);
-            border-radius: 10px;
-            border: 1px solid rgba(0,212,255,0.2);
-            animation: slideDown 0.3s ease;
+            backdrop-filter: blur(10px);
         }
 
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-10px); }
-            to { opacity: 1; transform: translateY(0); }
+        .industry-card:hover .capability-overlay {
+            opacity: 1;
         }
 
-        .capability-grid {
+        .capability-grid-mini {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: 1fr 1fr;
             gap: 15px;
-            margin: 15px 0;
+            margin-bottom: 15px;
+            width: 100%;
         }
 
-        .capability-item {
-            background: rgba(255,255,255,0.05);
-            border-radius: 8px;
-            padding: 12px;
+        .capability-item-mini {
             text-align: center;
-            border: 1px solid rgba(0,212,255,0.1);
-            transition: all 0.2s ease;
+            padding: 8px;
         }
 
-        .capability-item:hover {
-            background: rgba(0,212,255,0.1);
-            border-color: #00d4ff;
-        }
-
-        .cap-icon {
+        .capability-icon-mini {
             font-size: 1.5rem;
             margin-bottom: 5px;
+            display: block;
         }
 
-        .cap-name {
+        .capability-name-mini {
             color: #00d4ff;
-            font-weight: 600;
-            font-size: 0.9rem;
-            margin-bottom: 3px;
-        }
-
-        .cap-desc {
-            color: #b0b0b0;
             font-size: 0.8rem;
-            line-height: 1.3;
-        }
-
-        .metrics-showcase {
-            margin: 20px 0;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-            gap: 10px;
-            margin: 10px 0;
-        }
-
-        .metric-item {
-            background: rgba(0,255,0,0.1);
-            border: 1px solid rgba(0,255,0,0.3);
-            border-radius: 8px;
-            padding: 10px;
-            text-align: center;
-        }
-
-        .metric-value {
-            color: #00ff00;
-            font-weight: 700;
-            font-size: 1.1rem;
-        }
-
-        .metric-label {
-            color: #b0b0b0;
-            font-size: 0.8rem;
-            margin-top: 3px;
-        }
-
-        .action-buttons {
-            display: flex;
-            gap: 10px;
-            margin-top: 20px;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .demo-btn, .roi-btn, .learn-btn {
-            background: linear-gradient(45deg, #ff6b35, #ff8c42);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 20px;
-            cursor: pointer;
-            font-size: 0.85rem;
             font-weight: 600;
-            transition: all 0.3s ease;
-            flex: 1;
-            min-width: 100px;
+            line-height: 1.2;
         }
 
-        .demo-btn:hover, .roi-btn:hover, .learn-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255,107,53,0.4);
-        }
-
-        .roi-btn {
-            background: linear-gradient(45deg, #00d4ff, #0099cc);
-        }
-
-        .learn-btn {
+        .performance-badge {
             background: linear-gradient(45deg, #00ff00, #00cc00);
+            color: #000;
+            padding: 6px 12px;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-top: 10px;
         }
 
-        .expand-indicator {
-            margin-top: 15px;
-            padding: 8px;
-            border-top: 1px solid rgba(0,212,255,0.2);
-        }
-
-        .expand-indicator:hover {
-            background: rgba(0,212,255,0.1);
+        .overlay-title {
+            color: #fff;
+            font-size: 1rem;
+            font-weight: 700;
+            margin-bottom: 15px;
         }
 
         .industry-icon {
@@ -1306,59 +1245,32 @@ def index():
     <div class="container">
         <div class="header">
             <h1 class="main-title">Universal Document Analyzer</h1>
-            <p class="subtitle">AI-Powered Multi-Industry Document Intelligence Platform</p>
+            <p class="subtitle">AI-Powered Multi-Industry Document Intelligence</p>
         </div>
-
+        
         <div class="industry-selector">
-            <h2 class="selector-title">Select Your Industry</h2>
+            <h2 style="color: #00d4ff; text-align: center; margin-bottom: 30px;">Select Your Industry</h2>
             <div class="industry-grid">
-                {% for key, industry in industries.items() %}
-                <div class="industry-card" data-industry="{{ key }}" onclick="selectIndustry('{{ key }}')">
-                    <span class="industry-icon">{{ industry.icon }}</span>
-                    <div class="industry-name">{{ industry.name }}</div>
-                    <div class="industry-desc">{{ industry.description }}</div>
+                {% for industry in industries %}
+                <div class="industry-card" data-industry="{{ industry.id }}" onclick="selectIndustry('{{ industry.id }}')">
+                    <div class="industry-content">
+                        <span class="industry-icon">{{ industry.icon }}</span>
+                        <h3 style="color: white; margin-bottom: 10px;">{{ industry.name }}</h3>
+                        <p style="color: #b0b0b0; font-size: 0.9rem;">{{ industry.description }}</p>
+                    </div>
                     
-                    <!-- Capability Showcase -->
-                    <div class="capability-preview" id="preview-{{ key }}" style="display: none;">
-                        <div class="capability-header">
-                            <h4 style="color: #00d4ff; margin: 15px 0 10px 0;">🎯 What This Does For You:</h4>
-                        </div>
-                        
-                        {% if industry.capabilities %}
-                        <div class="capability-grid">
-                            {% for cap in industry.capabilities[:4] %}
-                            <div class="capability-item">
-                                <div class="cap-icon">{{ cap.icon }}</div>
-                                <div class="cap-name">{{ cap.name }}</div>
-                                <div class="cap-desc">{{ cap.desc }}</div>
+                    <!-- Sleek Hover Overlay -->
+                    <div class="capability-overlay">
+                        <div class="overlay-title">What This Does For You:</div>
+                        <div class="capability-grid-mini">
+                            {% for capability in industry.capabilities[:4] %}
+                            <div class="capability-item-mini">
+                                <span class="capability-icon-mini">{{ capability.icon }}</span>
+                                <div class="capability-name-mini">{{ capability.name }}</div>
                             </div>
                             {% endfor %}
                         </div>
-                        {% endif %}
-                        
-                        {% if industry.metrics %}
-                        <div class="metrics-showcase">
-                            <h5 style="color: #00d4ff; margin: 15px 0 10px 0;">📊 Performance Metrics:</h5>
-                            <div class="metrics-grid">
-                                {% for metric_key, metric_value in industry.metrics.items() %}
-                                <div class="metric-item">
-                                    <div class="metric-value">{{ metric_value }}</div>
-                                    <div class="metric-label">{{ metric_key.replace('_', ' ').title() }}</div>
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <div class="action-buttons">
-                            <button class="demo-btn" onclick="showLiveDemo('{{ key }}')">🎬 Live Demo</button>
-                            <button class="roi-btn" onclick="showROICalculator('{{ key }}')">💰 ROI Calculator</button>
-                            <button class="learn-btn" onclick="showFeatureDetails('{{ key }}')">📖 Learn More</button>
-                        </div>
-                    </div>
-                    
-                    <div class="expand-indicator" id="expand-{{ key }}">
-                        <span style="color: #00d4ff; font-size: 0.9rem; cursor: pointer;">▼ View Capabilities</span>
+                        <div class="performance-badge">{{ industry.performance_metric }}</div>
                     </div>
                 </div>
                 {% endfor %}
@@ -1698,113 +1610,8 @@ def index():
             }
         }
 
-        // Capability showcase functions
-        function toggleCapabilities(industry) {
-            const preview = document.getElementById('preview-' + industry);
-            const indicator = document.getElementById('expand-' + industry);
-            const card = document.querySelector(`[data-industry="${industry}"]`);
-            
-            if (preview.style.display === 'none') {
-                // Hide all other previews
-                document.querySelectorAll('.capability-preview').forEach(p => {
-                    p.style.display = 'none';
-                });
-                document.querySelectorAll('.industry-card').forEach(c => {
-                    c.classList.remove('expanded');
-                });
-                document.querySelectorAll('.expand-indicator span').forEach(s => {
-                    s.textContent = '▼ View Capabilities';
-                });
-                
-                // Show this preview
-                preview.style.display = 'block';
-                card.classList.add('expanded');
-                indicator.querySelector('span').textContent = '▲ Hide Capabilities';
-            } else {
-                preview.style.display = 'none';
-                card.classList.remove('expanded');
-                indicator.querySelector('span').textContent = '▼ View Capabilities';
-            }
-        }
-
-        function showLiveDemo(industry) {
-            alert(`🎬 Live Demo for ${industry.charAt(0).toUpperCase() + industry.slice(1)} coming soon! This will show real-time document analysis in action.`);
-        }
-
-        function showROICalculator(industry) {
-            const modal = document.createElement('div');
-            modal.style.cssText = `
-                position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(0,0,0,0.8); display: flex; align-items: center; 
-                justify-content: center; z-index: 1000;
-            `;
-            
-            modal.innerHTML = `
-                <div style="background: #1a1a2e; border: 2px solid #00d4ff; border-radius: 15px; padding: 30px; max-width: 500px; width: 90%;">
-                    <h3 style="color: #00d4ff; margin-bottom: 20px;">💰 ROI Calculator - ${industry.charAt(0).toUpperCase() + industry.slice(1)}</h3>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label style="color: #b0b0b0; display: block; margin-bottom: 5px;">Documents per month:</label>
-                        <input type="number" id="docsPerMonth" value="50" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00d4ff; background: rgba(0,0,0,0.3); color: white;">
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label style="color: #b0b0b0; display: block; margin-bottom: 5px;">Hours per document:</label>
-                        <input type="number" id="hoursPerDoc" value="2.5" step="0.1" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00d4ff; background: rgba(0,0,0,0.3); color: white;">
-                    </div>
-                    
-                    <div style="margin-bottom: 15px;">
-                        <label style="color: #b0b0b0; display: block; margin-bottom: 5px;">Hourly rate ($):</label>
-                        <input type="number" id="hourlyRate" value="75" style="width: 100%; padding: 8px; border-radius: 5px; border: 1px solid #00d4ff; background: rgba(0,0,0,0.3); color: white;">
-                    </div>
-                    
-                    <div id="roiResults" style="background: rgba(0,255,0,0.1); border: 1px solid #00ff00; border-radius: 10px; padding: 15px; margin: 20px 0;">
-                        <div style="color: #00ff00; font-weight: 600; margin-bottom: 10px;">📊 Calculated Savings:</div>
-                        <div style="color: white;">⏰ Time Saved: <span id="timeSaved">112.5</span> hours/month</div>
-                        <div style="color: white;">💰 Cost Saved: $<span id="costSaved">8,437</span>/month</div>
-                        <div style="color: white;">🎯 Annual ROI: $<span id="annualROI">101,244</span></div>
-                    </div>
-                    
-                    <div style="display: flex; gap: 10px; margin-top: 20px;">
-                        <button onclick="calculateROI()" style="background: #00d4ff; color: #000; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 600; flex: 1;">🔄 Recalculate</button>
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: #ff6b35; color: white; border: none; padding: 10px 20px; border-radius: 20px; cursor: pointer; font-weight: 600;">✕ Close</button>
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-            modal.onclick = (e) => { if (e.target === modal) modal.remove(); };
-        }
-
-        function calculateROI() {
-            const docs = parseFloat(document.getElementById('docsPerMonth').value) || 50;
-            const hours = parseFloat(document.getElementById('hoursPerDoc').value) || 2.5;
-            const rate = parseFloat(document.getElementById('hourlyRate').value) || 75;
-            
-            const totalHours = docs * hours;
-            const timeSaved = totalHours * 0.9; // 90% time reduction
-            const costSaved = timeSaved * rate;
-            const annualROI = costSaved * 12;
-            
-            document.getElementById('timeSaved').textContent = timeSaved.toFixed(1);
-            document.getElementById('costSaved').textContent = costSaved.toLocaleString();
-            document.getElementById('annualROI').textContent = annualROI.toLocaleString();
-        }
-
-        function showFeatureDetails(industry) {
-            alert(`📖 Detailed feature documentation for ${industry.charAt(0).toUpperCase() + industry.slice(1)} coming soon! This will show comprehensive capability guides.`);
-        }
-
-        // Enhanced industry selection with capability showcase
+        // Simplified industry selection - no more capability showcase functions needed
         function selectIndustry(industry) {
-            // First toggle capabilities if not already shown
-            const preview = document.getElementById('preview-' + industry);
-            if (preview.style.display === 'none') {
-                toggleCapabilities(industry);
-                return; // Don't proceed to upload section yet
-            }
-            
-            // If capabilities are already shown, proceed with selection
             selectedIndustry = industry;
             
             // Update UI
@@ -1829,17 +1636,6 @@ def index():
             // Scroll to upload section
             document.getElementById('uploadSection').scrollIntoView({ behavior: 'smooth' });
         }
-
-        // Add click handlers for expand indicators
-        document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.expand-indicator').forEach(indicator => {
-                indicator.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    const industry = this.id.replace('expand-', '');
-                    toggleCapabilities(industry);
-                });
-            });
-        });
 
         function displayAnalysisRules(data) {
             const container = document.getElementById('rulesContent');
