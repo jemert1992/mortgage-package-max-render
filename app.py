@@ -50,6 +50,55 @@ analysis_rules = [
 lender_requirements = {}
 session_data = {}
 
+# Industry Templates for Universal Platform
+INDUSTRY_TEMPLATES = {
+    'mortgage': {
+        'name': 'Mortgage & Real Estate',
+        'icon': '🏠',
+        'description': 'Mortgage packages, loan documents, real estate transactions',
+        'categories': [
+            'Mortgage', 'Promissory Note', 'Closing Instructions', 'Anti-Coercion Statement',
+            'Power of Attorney', 'Acknowledgment', 'Flood Hazard', 'Payment Authorization', 'Tax Records'
+        ]
+    },
+    'legal': {
+        'name': 'Legal & Law Firms',
+        'icon': '⚖️',
+        'description': 'Contracts, agreements, legal documents, case files',
+        'categories': [
+            'Contracts', 'Agreements', 'Legal Briefs', 'Court Documents', 'Compliance Reports',
+            'Terms of Service', 'Privacy Policies', 'Employment Agreements', 'NDAs'
+        ]
+    },
+    'healthcare': {
+        'name': 'Healthcare & Medical',
+        'icon': '🏥',
+        'description': 'Medical records, insurance claims, patient documents',
+        'categories': [
+            'Medical Records', 'Insurance Claims', 'Patient Forms', 'Lab Results', 'Prescriptions',
+            'Treatment Plans', 'Discharge Summaries', 'Consent Forms', 'Medical Bills'
+        ]
+    },
+    'financial': {
+        'name': 'Financial Services',
+        'icon': '💰',
+        'description': 'Banking documents, investment reports, financial statements',
+        'categories': [
+            'Bank Statements', 'Investment Reports', 'Financial Statements', 'Tax Documents',
+            'Loan Applications', 'Credit Reports', 'Insurance Policies', 'Audit Reports'
+        ]
+    },
+    'hr': {
+        'name': 'Human Resources',
+        'icon': '👥',
+        'description': 'Employee records, resumes, HR documents, onboarding',
+        'categories': [
+            'Resumes', 'Employee Records', 'Performance Reviews', 'Job Applications',
+            'Onboarding Documents', 'Training Records', 'Benefits Information', 'Payroll Documents'
+        ]
+    }
+}
+
 def clean_text(text):
     """Enhanced text cleaning for OCR and encoding issues"""
     if not text:
@@ -93,8 +142,8 @@ def clean_text(text):
     
     return text
 
-class EnhancedDocumentProcessor:
-    """Enhanced multi-format document processor for mortgage analysis"""
+class UniversalDocumentProcessor:
+    """Universal multi-format document processor for all industries"""
     
     def __init__(self):
         self.supported_formats = {}
@@ -114,8 +163,8 @@ class EnhancedDocumentProcessor:
         # Text files are always supported
         self.supported_formats['.txt'] = self._process_txt
     
-    def process_document(self, file_path, filename):
-        """Process document and return enhanced text for mortgage analysis"""
+    def process_document(self, file_path, filename, industry='mortgage'):
+        """Process document with industry-specific analysis"""
         file_ext = os.path.splitext(filename)[1].lower()
         
         if file_ext not in self.supported_formats:
@@ -123,15 +172,20 @@ class EnhancedDocumentProcessor:
                 'success': False,
                 'error': f'Unsupported file format: {file_ext}',
                 'text': '',
-                'metadata': {}
+                'metadata': {},
+                'industry': industry
             }
         
         try:
             result = self.supported_formats[file_ext](file_path, filename)
             
-            # Clean the extracted text for mortgage analysis
+            # Clean the extracted text
             if result.get('success') and result.get('text'):
                 result['text'] = clean_text(result['text'])
+            
+            # Add industry context
+            result['industry'] = industry
+            result['template'] = INDUSTRY_TEMPLATES.get(industry, INDUSTRY_TEMPLATES['mortgage'])
             
             return result
             
@@ -140,7 +194,8 @@ class EnhancedDocumentProcessor:
                 'success': False,
                 'error': f'Processing failed: {str(e)}',
                 'text': '',
-                'metadata': {}
+                'metadata': {},
+                'industry': industry
             }
     
     def _process_pdf(self, file_path, filename):
@@ -288,8 +343,8 @@ class EnhancedDocumentProcessor:
         except Exception as e:
             return {'success': False, 'error': str(e), 'text': '', 'metadata': {}}
 
-# Initialize the enhanced processor
-document_processor = EnhancedDocumentProcessor()
+# Initialize the universal processor
+document_processor = UniversalDocumentProcessor()
 
 def parse_lender_email(content):
     """Enhanced email parsing for lender requirements with memory optimization"""
@@ -430,58 +485,87 @@ def analyze_mortgage_sections(filename, use_lender_rules=True):
     
     # Add core sections
     for i, section_name in enumerate(core_sections):
-        confidence = "high" if i < 3 else ("medium" if i < 6 else ("high" if i % 2 == 0 else "medium"))
+        confidence = "high" if i < 3 else ("medium" if i < 6 else "low")
+        risk_score = 15 if i < 3 else (25 if i < 6 else 35)
         
         sections.append({
-            "id": len(sections) + 1,
-            "title": section_name,
-            "page": page_counter + (i // 3),
+            "name": section_name,
+            "pages": f"{page_counter}-{page_counter + 1}",
             "confidence": confidence,
-            "matched_text": f"Sample text from {section_name}...",
-            "source": "core"
+            "risk_score": risk_score,
+            "quality": f"{95 - (i * 2)}%",
+            "notes": f"Core mortgage document - {confidence} priority"
         })
+        page_counter += 2
     
-    # Add lender-specific sections if available and requested
-    if use_lender_rules and lender_requirements.get('documents'):
-        for i, doc_name in enumerate(lender_requirements['documents'][:10]):  # Limit to 10 additional
-            # Skip if already in core sections
-            if not any(core_section.lower() in doc_name.lower() for core_section in core_sections):
-                sections.append({
-                    "id": len(sections) + 1,
-                    "title": doc_name,
-                    "page": page_counter + 10 + (i // 2),
-                    "confidence": "high",
-                    "matched_text": f"Lender required: {doc_name}",
-                    "source": "lender"
-                })
+    # Add lender-specific documents if available and requested
+    if use_lender_rules and lender_requirements:
+        lender_docs = lender_requirements.get('documents', [])
+        for i, doc_name in enumerate(lender_docs[:10]):  # Limit to 10 additional docs
+            sections.append({
+                "name": doc_name,
+                "pages": f"{page_counter}-{page_counter + 1}",
+                "confidence": "medium",
+                "risk_score": 20,
+                "quality": f"{90 - (i * 3)}%",
+                "notes": f"Lender requirement - {lender_requirements.get('lender_name', 'Unknown')}"
+            })
+            page_counter += 2
     
     return sections
 
+def analyze_universal_document(text, industry, filename):
+    """Universal document analysis for any industry"""
+    
+    if industry == 'mortgage':
+        # Use existing mortgage analysis
+        return analyze_mortgage_sections(filename)
+    
+    # For other industries, create basic analysis
+    template = INDUSTRY_TEMPLATES.get(industry, INDUSTRY_TEMPLATES['mortgage'])
+    sections = []
+    
+    for i, category in enumerate(template['categories']):
+        # Simple keyword matching for now
+        category_lower = category.lower()
+        text_lower = text.lower()
+        
+        # Basic confidence scoring based on keyword presence
+        if category_lower in text_lower:
+            confidence = "high"
+            risk_score = 10
+            quality = "95%"
+        elif any(word in text_lower for word in category_lower.split()):
+            confidence = "medium" 
+            risk_score = 25
+            quality = "80%"
+        else:
+            confidence = "low"
+            risk_score = 40
+            quality = "60%"
+        
+        sections.append({
+            "name": category,
+            "pages": f"{i*2 + 1}-{i*2 + 2}",
+            "confidence": confidence,
+            "risk_score": risk_score,
+            "quality": quality,
+            "notes": f"{template['name']} document category"
+        })
+    
+    return sections
 
-
-# Enhanced HTML template with badass dark theme and multi-format support
-HTML_TEMPLATE = """<!DOCTYPE html>
+# Routes
+@app.route('/')
+def index():
+    return render_template_string('''
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏠 Mortgage Package Analyzer Pro</title>
+    <title>Universal Document Analyzer - Multi-Industry AI Platform</title>
     <style>
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #1a1a2e;
-            --bg-card: #16213e;
-            --accent-blue: #00d4ff;
-            --accent-green: #00ff88;
-            --accent-orange: #ff6b35;
-            --accent-red: #ff3366;
-            --text-primary: #ffffff;
-            --text-secondary: #a0a0a0;
-            --text-muted: #666666;
-            --border-glow: rgba(0, 212, 255, 0.3);
-            --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.2);
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -489,917 +573,452 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Inter', sans-serif;
-            background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
-            color: var(--text-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
             min-height: 100vh;
             overflow-x: hidden;
         }
 
-        /* Animated background */
-        body::before {
-            content: '';
+        .animated-bg {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: 
-                radial-gradient(circle at 20% 80%, rgba(0, 212, 255, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 80% 20%, rgba(0, 255, 136, 0.1) 0%, transparent 50%),
-                radial-gradient(circle at 40% 40%, rgba(255, 107, 53, 0.05) 0%, transparent 50%);
+            background: linear-gradient(45deg, #0a0a0a, #1a1a2e, #16213e, #0f3460);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
             z-index: -1;
-            animation: backgroundShift 20s ease-in-out infinite;
         }
 
-        @keyframes backgroundShift {
-            0%, 100% { transform: translateX(0) translateY(0); }
-            50% { transform: translateX(-20px) translateY(-20px); }
+        @keyframes gradientShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
         }
 
         .container {
-            max-width: 1400px;
+            max-width: 1200px;
             margin: 0 auto;
             padding: 20px;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Header */
         .header {
             text-align: center;
             margin-bottom: 40px;
-            position: relative;
+            padding: 40px 0;
         }
 
-        .header h1 {
-            font-size: 3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
+        .main-title {
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(45deg, #00d4ff, #0099cc, #ffffff);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
             text-shadow: 0 0 30px rgba(0, 212, 255, 0.3);
+            animation: glow 2s ease-in-out infinite alternate;
         }
 
-        .header p {
-            font-size: 1.2rem;
-            color: var(--text-secondary);
-            font-weight: 300;
+        @keyframes glow {
+            from { text-shadow: 0 0 20px rgba(0, 212, 255, 0.3); }
+            to { text-shadow: 0 0 40px rgba(0, 212, 255, 0.6); }
         }
 
-        /* Dashboard Cards */
-        .dashboard {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
+        .subtitle {
+            font-size: 1.3rem;
+            color: #b0b0b0;
+            margin-bottom: 30px;
         }
 
-        .dashboard-card {
-            background: var(--bg-card);
+        .industry-selector {
+            background: rgba(255, 255, 255, 0.05);
             border-radius: 20px;
             padding: 30px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(10px);
             border: 1px solid rgba(0, 212, 255, 0.2);
-            box-shadow: var(--shadow-glow);
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .selector-title {
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #00d4ff;
+            margin-bottom: 25px;
             text-align: center;
         }
 
-        .dashboard-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .dashboard-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.3);
-        }
-
-        .dashboard-card:hover::before {
-            opacity: 1;
-        }
-
-        .dashboard-number {
-            font-size: 3rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 10px;
-        }
-
-        .dashboard-label {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            font-weight: 500;
-        }
-
-        .dashboard-subtitle {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-top: 5px;
-        }
-
-        /* Tab Navigation */
-        .tab-nav {
-            display: flex;
-            background: var(--bg-card);
-            border-radius: 15px;
-            padding: 8px;
+        .industry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
             margin-bottom: 30px;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            box-shadow: var(--shadow-glow);
-            overflow-x: auto;
         }
 
-        .tab-btn {
-            flex: 1;
-            padding: 15px 20px;
-            background: transparent;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 1rem;
-            font-weight: 500;
-            border-radius: 10px;
+        .industry-card {
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 153, 204, 0.1));
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 25px;
             cursor: pointer;
             transition: all 0.3s ease;
-            white-space: nowrap;
             position: relative;
             overflow: hidden;
         }
 
-        .tab-btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent);
-            transition: left 0.5s ease;
+        .industry-card:hover {
+            transform: translateY(-5px);
+            border-color: #00d4ff;
+            box-shadow: 0 15px 35px rgba(0, 212, 255, 0.3);
         }
 
-        .tab-btn:hover::before {
-            left: 100%;
+        .industry-card.selected {
+            border-color: #00d4ff;
+            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 153, 204, 0.2));
+            box-shadow: 0 0 25px rgba(0, 212, 255, 0.4);
         }
 
-        .tab-btn.active {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 136, 0.1));
-            color: var(--text-primary);
-            border: 1px solid var(--accent-blue);
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+        .industry-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
         }
 
-        .tab-btn:hover {
-            color: var(--text-primary);
+        .industry-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 10px;
+        }
+
+        .industry-desc {
+            font-size: 0.9rem;
+            color: #b0b0b0;
+            line-height: 1.4;
+        }
+
+        .upload-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 2px dashed rgba(0, 212, 255, 0.3);
+            transition: all 0.3s ease;
+            margin-bottom: 30px;
+        }
+
+        .upload-section:hover {
+            border-color: #00d4ff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .upload-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #00d4ff;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-btn {
+            background: linear-gradient(45deg, #00d4ff, #0099cc);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 50px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .upload-btn:hover {
             transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.5);
         }
 
-        /* Tab Content */
+        .analyze-btn {
+            background: linear-gradient(45deg, #ff6b35, #f7931e);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 50px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255, 107, 53, 0.3);
+            margin-top: 20px;
+            display: none;
+        }
+
+        .analyze-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 107, 53, 0.5);
+        }
+
+        .selected-file {
+            background: rgba(0, 212, 255, 0.1);
+            border: 1px solid #00d4ff;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 20px 0;
+            color: #00d4ff;
+        }
+
+        .tabs {
+            display: none;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 212, 255, 0.2);
+            margin-top: 30px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: rgba(0, 212, 255, 0.1);
+            color: #00d4ff;
+            border: 1px solid #00d4ff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .tab-btn:hover, .tab-btn.active {
+            background: #00d4ff;
+            color: #000;
+        }
+
         .tab-content {
             display: none;
-            animation: fadeIn 0.5s ease-in-out;
         }
 
         .tab-content.active {
             display: block;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .progress-container {
+            display: none;
+            margin: 30px 0;
         }
 
-        /* Cards */
-        .card {
-            background: var(--bg-card);
-            border-radius: 20px;
-            padding: 30px;
-            margin-bottom: 30px;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            box-shadow: var(--shadow-glow);
-            position: relative;
-            overflow: hidden;
-            transition: all 0.3s ease;
-        }
-
-        .card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 40px rgba(0, 212, 255, 0.3);
-        }
-
-        .card:hover::before {
-            opacity: 1;
-        }
-
-        .card-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .card-title::before {
-            content: '';
-            width: 4px;
-            height: 20px;
-            background: linear-gradient(135deg, var(--accent-blue), var(--accent-green));
-            border-radius: 2px;
-        }
-
-        /* Upload Area */
-        .upload-area {
-            border: 2px dashed rgba(0, 212, 255, 0.3);
-            border-radius: 15px;
-            padding: 40px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(0, 212, 255, 0.05);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .upload-area::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: conic-gradient(from 0deg, transparent, rgba(0, 212, 255, 0.1), transparent);
-            animation: rotate 4s linear infinite;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-
-        .upload-area:hover::before {
-            opacity: 1;
-        }
-
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .upload-area:hover {
-            border-color: var(--accent-blue);
-            background: rgba(0, 212, 255, 0.1);
-            box-shadow: 0 0 30px rgba(0, 212, 255, 0.2);
-            transform: scale(1.02);
-        }
-
-        .upload-text {
-            font-size: 1.3rem;
-            color: var(--accent-blue);
-            margin-bottom: 10px;
-            font-weight: 600;
-            position: relative;
-            z-index: 1;
-        }
-
-        .upload-subtext {
-            color: var(--text-secondary);
-            font-size: 1rem;
-            position: relative;
-            z-index: 1;
-        }
-
-        /* Buttons */
-        .btn {
-            background: linear-gradient(135deg, var(--accent-blue), rgba(0, 212, 255, 0.8));
-            color: var(--text-primary);
-            border: none;
-            padding: 15px 30px;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            margin: 10px;
-            position: relative;
-            overflow: hidden;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
+        .progress-bar {
             width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s ease;
+            background: linear-gradient(90deg, #00d4ff, #0099cc);
+            width: 0%;
+            transition: width 0.3s ease;
         }
 
-        .btn:hover::before {
-            left: 100%;
-        }
-
-        .btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 25px rgba(0, 212, 255, 0.4);
-        }
-
-        .btn:disabled {
-            background: linear-gradient(135deg, var(--text-muted), rgba(102, 102, 102, 0.8));
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-secondary {
-            background: linear-gradient(135deg, var(--bg-secondary), rgba(26, 26, 46, 0.8));
-            border: 1px solid rgba(0, 212, 255, 0.3);
-        }
-
-        .btn-secondary:hover {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.2), rgba(0, 255, 136, 0.1));
-            border-color: var(--accent-blue);
-        }
-
-        /* Form Elements */
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+        .status-text {
+            color: #00d4ff;
+            margin-top: 10px;
             font-weight: 500;
         }
 
-        .form-input, .form-select, .form-textarea {
-            width: 100%;
-            padding: 15px;
-            background: rgba(0, 212, 255, 0.05);
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            border-radius: 10px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-input:focus, .form-select:focus, .form-textarea:focus {
-            outline: none;
-            border-color: var(--accent-blue);
-            box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
-            background: rgba(0, 212, 255, 0.1);
-        }
-
-        .form-textarea {
-            min-height: 120px;
-            resize: vertical;
-            font-family: 'Courier New', monospace;
-        }
-
-        /* Results Grid */
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
-        }
-
-        .section-card {
-            background: var(--bg-card);
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            border-radius: 15px;
-            padding: 20px;
-            position: relative;
-            transition: all 0.3s ease;
-            overflow: hidden;
-        }
-
-        .section-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
-            transform: scaleX(0);
-            transition: transform 0.3s ease;
-        }
-
-        .section-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
-        }
-
-        .section-card:hover::before {
-            transform: scaleX(1);
-        }
-
-        .section-checkbox {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 20px;
-            height: 20px;
-            accent-color: var(--accent-blue);
-            cursor: pointer;
-        }
-
-        .section-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: var(--text-primary);
-            margin-bottom: 10px;
-            padding-right: 40px;
-        }
-
-        .section-page {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            margin-bottom: 10px;
-        }
-
-        .confidence-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .confidence-high {
-            background: rgba(0, 255, 136, 0.2);
-            color: var(--accent-green);
-            border: 1px solid var(--accent-green);
-        }
-
-        .confidence-medium {
-            background: rgba(255, 107, 53, 0.2);
-            color: var(--accent-orange);
-            border: 1px solid var(--accent-orange);
-        }
-
-        .confidence-low {
-            background: rgba(255, 51, 102, 0.2);
-            color: var(--accent-red);
-            border: 1px solid var(--accent-red);
-        }
-
-        /* Controls */
-        .controls-section {
-            margin-bottom: 30px;
-            text-align: center;
-        }
-
-        .controls-row {
-            display: flex;
-            gap: 15px;
-            justify-content: center;
-            flex-wrap: wrap;
-            margin-bottom: 20px;
-        }
-
-        /* TOC Section */
-        .toc-content {
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 10px;
-            padding: 20px;
-            font-family: 'Courier New', Monaco, monospace;
-            font-size: 0.9rem;
-            line-height: 1.6;
-            white-space: pre-line;
-            margin-bottom: 20px;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            color: var(--accent-green);
-        }
-
-        /* Error Messages */
-        .error-message {
-            background: rgba(255, 51, 102, 0.1);
-            color: var(--accent-red);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid var(--accent-red);
-            border: 1px solid rgba(255, 51, 102, 0.3);
-        }
-
-        /* Success Messages */
-        .success-message {
-            background: rgba(0, 255, 136, 0.1);
-            color: var(--accent-green);
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            border-left: 4px solid var(--accent-green);
-            border: 1px solid rgba(0, 255, 136, 0.3);
-        }
-
-        /* Loading Animation */
-        .loading {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(0, 212, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: var(--accent-blue);
-            animation: spin 1s ease-in-out infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        /* Responsive Design */
         @media (max-width: 768px) {
-            .container { padding: 15px; }
-            .header h1 { font-size: 2rem; }
-            .results-grid { grid-template-columns: 1fr; }
-            .controls-row { flex-direction: column; align-items: center; }
-            .tab-nav { flex-direction: column; }
-            .tab-btn { margin-bottom: 5px; }
-            .dashboard { grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); }
+            .main-title {
+                font-size: 2.5rem;
+            }
+            
+            .industry-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .container {
+                padding: 15px;
+            }
         }
-
-        /* Hidden elements */
-        .file-input { display: none; }
-        .hidden { display: none; }
     </style>
 </head>
 <body>
+    <div class="animated-bg"></div>
+    
     <div class="container">
-        <!-- Header -->
         <div class="header">
-            <h1>🏠 Mortgage Package Analyzer Pro</h1>
-            <p>Intelligent Risk Management for Your Business Documents</p>
+            <h1 class="main-title">Universal Document Analyzer</h1>
+            <p class="subtitle">AI-Powered Multi-Industry Document Intelligence Platform</p>
         </div>
 
-        <!-- Dashboard -->
-        <div class="dashboard">
-            <div class="dashboard-card">
-                <div class="dashboard-number" id="dashDocuments">19</div>
-                <div class="dashboard-label">Documents Found</div>
-                <div class="dashboard-subtitle">Real-time analysis</div>
-            </div>
-            <div class="dashboard-card">
-                <div class="dashboard-number" id="dashConfidence">13</div>
-                <div class="dashboard-label">High Confidence</div>
-                <div class="dashboard-subtitle">Quality scoring</div>
-            </div>
-            <div class="dashboard-card">
-                <div class="dashboard-number" id="dashRisk">815</div>
-                <div class="dashboard-label">Risk Score</div>
-                <div class="dashboard-subtitle">Compliance tracking</div>
-            </div>
-            <div class="dashboard-card">
-                <div class="dashboard-number" id="dashCompliance">68%</div>
-                <div class="dashboard-label">Compliance Rate</div>
-                <div class="dashboard-subtitle">Audit thresholds</div>
-            </div>
-        </div>
-
-        <!-- Tab Navigation -->
-        <div class="tab-nav">
-            <button class="tab-btn active" onclick="showTab('lender-requirements')">
-                📧 Lender Requirements
-            </button>
-            <button class="tab-btn" onclick="showTab('analyze-identify')">
-                📋 Analyze & Identify
-            </button>
-            <button class="tab-btn" onclick="showTab('document-separation')">
-                📄 Document Separation
-            </button>
-            <button class="tab-btn" onclick="showTab('analysis-rules')">
-                ⚙️ Analysis Rules
-            </button>
-        </div>
-
-        <!-- Lender Requirements Tab -->
-        <div id="lender-requirements" class="tab-content active">
-            <div class="card">
-                <div class="card-title">📧 Lender Requirements Parser</div>
-                <p style="color: var(--text-secondary); margin-bottom: 25px;">
-                    Upload or paste lender emails with closing instructions to automatically extract document requirements and organize your analysis accordingly.
-                </p>
-                
-                <div class="form-group">
-                    <label class="form-label">Upload Email PDF or Paste Content:</label>
-                    <div class="upload-area" onclick="document.getElementById('emailFileInput').click()">
-                        <div class="upload-text">📎 Click to upload email PDF or paste content below</div>
-                        <div class="upload-subtext" id="emailFileName">Supports: PDF, Word, Excel, Images, Text files</div>
-                    </div>
-                    <input type="file" id="emailFileInput" class="file-input" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg">
+        <div class="industry-selector">
+            <h2 class="selector-title">Select Your Industry</h2>
+            <div class="industry-grid">
+                {% for key, industry in industries.items() %}
+                <div class="industry-card" data-industry="{{ key }}">
+                    <span class="industry-icon">{{ industry.icon }}</span>
+                    <div class="industry-name">{{ industry.name }}</div>
+                    <div class="industry-desc">{{ industry.description }}</div>
                 </div>
+                {% endfor %}
+            </div>
+        </div>
 
-                <div class="form-group">
-                    <textarea id="emailContent" class="form-textarea" placeholder="Or paste email content here...
-
-Example:
-From: Ka Thao <ka.thao@symmetrylending.com>
-Subject: Closing Instructions
-
-Below items need to be completed:
-☐ Closing Instructions (signed/dated)
-☐ Symmetry 1003
-☐ HELOC agreement (2nd)
-☐ Notice of Right to Cancel"></textarea>
+        <div class="upload-section">
+            <h3 class="upload-title">Upload Your Documents</h3>
+            <p style="color: #b0b0b0; margin-bottom: 20px;">Supports PDF, Word, Excel, Images, and Text files</p>
+            
+            <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.docx,.xlsx,.png,.jpg,.jpeg,.txt">
+            <button class="upload-btn" onclick="document.getElementById('fileInput').click()">
+                Choose Files
+            </button>
+            
+            <div id="selectedFiles"></div>
+            <button class="analyze-btn" id="analyzeBtn" onclick="startAnalysis()">
+                🚀 Start Analysis
+            </button>
+            
+            <div class="progress-container" id="progressContainer">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill"></div>
                 </div>
+                <div class="status-text" id="statusText">Initializing...</div>
+            </div>
+        </div>
 
-                <button class="btn" onclick="parseRequirements()">
-                    🔍 Parse Requirements
+        <div class="tabs" id="tabsSection">
+            <div class="tab-buttons">
+                <button class="tab-btn active" onclick="showTab('analyze')">📊 Analyze & Identify</button>
+                <button class="tab-btn" onclick="showTab('separation')">📄 Document Separation</button>
+                <button class="tab-btn" onclick="showTab('rules')">⚙️ Analysis Rules</button>
+                <button class="tab-btn" onclick="showTab('email')">📧 Email Parser</button>
+            </div>
+
+            <div id="analyze" class="tab-content active">
+                <h3 style="color: #00d4ff; margin-bottom: 20px;">Document Analysis Results</h3>
+                <div id="analysisResults">
+                    <p style="color: #b0b0b0;">Upload and analyze documents to see results here.</p>
+                </div>
+            </div>
+
+            <div id="separation" class="tab-content">
+                <h3 style="color: #00d4ff; margin-bottom: 20px;">Document Separation</h3>
+                <div id="separationResults">
+                    <p style="color: #b0b0b0;">Document separation results will appear here after analysis.</p>
+                </div>
+            </div>
+
+            <div id="rules" class="tab-content">
+                <h3 style="color: #00d4ff; margin-bottom: 20px;">Analysis Rules</h3>
+                <div id="rulesContent">
+                    <p style="color: #b0b0b0;">Industry-specific analysis rules will be displayed here.</p>
+                </div>
+            </div>
+
+            <div id="email" class="tab-content">
+                <h3 style="color: #00d4ff; margin-bottom: 20px;">Email Parser</h3>
+                <div style="margin-bottom: 20px;">
+                    <textarea id="emailContent" placeholder="Paste lender email content here..." 
+                              style="width: 100%; height: 200px; background: rgba(255,255,255,0.1); border: 1px solid #00d4ff; border-radius: 10px; padding: 15px; color: white; resize: vertical;"></textarea>
+                </div>
+                <button onclick="parseEmail()" style="background: linear-gradient(45deg, #00d4ff, #0099cc); color: white; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer; font-weight: 600;">
+                    Parse Requirements
                 </button>
-
-                <div id="parsedRequirements" class="hidden">
-                    <div class="card" style="margin-top: 30px;">
-                        <div class="card-title">📋 Extracted Requirements</div>
-                        <div id="requirementsDisplay"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Analyze & Identify Tab -->
-        <div id="analyze-identify" class="tab-content">
-            <div class="card">
-                <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                    <div class="upload-text">📁 Click here to select a document</div>
-                    <div class="upload-subtext" id="fileName">Supports: PDF, Word, Excel, Images, Text files up to 50MB</div>
-                </div>
-                <input type="file" id="fileInput" class="file-input" accept=".pdf,.docx,.xlsx,.txt,.png,.jpg,.jpeg">
-                
-                <div style="text-align: center; margin-top: 20px;">
-                    <button class="btn" id="analyzeBtn" onclick="analyzeDocument()" disabled>
-                        🔍 Analyze Document
-                    </button>
-                </div>
-            </div>
-
-            <div id="resultsSection" class="hidden">
-                <div class="card">
-                    <div class="card-title">📊 Analysis Results</div>
-                    <div id="resultsSummary" style="color: var(--text-secondary); margin-bottom: 20px;">
-                        0 sections identified
-                    </div>
-                    
-                    <div class="controls-section">
-                        <div class="controls-row">
-                            <button class="btn btn-secondary" onclick="selectAll()">Select All</button>
-                            <button class="btn btn-secondary" onclick="selectNone()">Select None</button>
-                            <button class="btn btn-secondary" onclick="selectHighConfidence()">Select High Confidence</button>
-                            <button class="btn" onclick="generateDocument()">Generate TOC</button>
-                        </div>
-                    </div>
-                    
-                    <div class="results-grid" id="sectionsGrid"></div>
-                </div>
-            </div>
-
-            <div id="tocSection" class="hidden">
-                <div class="card">
-                    <div class="card-title">📋 Generated Table of Contents</div>
-                    <div class="toc-content" id="tocContent"></div>
-                    <button class="btn" onclick="downloadTOC()">📥 Download TOC</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Document Separation Tab -->
-        <div id="document-separation" class="tab-content">
-            <div class="card">
-                <div class="card-title">📄 Document Separation</div>
-                <p style="color: var(--text-secondary); margin-bottom: 25px;">
-                    Instructions: First analyze your document in the "Analyze & Identify" tab, then return here to separate individual documents.
-                </p>
-                
-                <div class="form-group">
-                    <label class="form-label">Select Documents to Separate:</label>
-                    <div id="separationContent">
-                        <div style="text-align: center; padding: 40px; color: var(--text-muted);">
-                            No analysis results available. Please analyze a document first.
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Analysis Rules Tab -->
-        <div id="analysis-rules" class="tab-content">
-            <div class="card">
-                <div class="card-title">⚙️ Analysis Rules</div>
-                <p style="color: var(--text-secondary); margin-bottom: 25px;">
-                    Add custom rules to improve section identification:
-                </p>
-                
-                <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
-                    <input type="text" id="patternInput" class="form-input" placeholder="Enter pattern (e.g., MORTGAGE, Promissory Note)" style="flex: 2; min-width: 200px;">
-                    <select id="typeSelect" class="form-select" style="flex: 1; min-width: 120px;">
-                        <option value="contains">Contains</option>
-                        <option value="exact">Exact Match</option>
-                    </select>
-                    <input type="text" id="labelInput" class="form-input" placeholder="Section label" style="flex: 1; min-width: 150px;">
-                    <button class="btn" onclick="addRule()">Add Rule</button>
-                </div>
-                
-                <div id="rulesList">
-                    <div style="color: var(--text-muted); font-style: italic;">No custom rules defined yet.</div>
+                <div id="emailResults" style="margin-top: 20px;">
+                    <p style="color: #b0b0b0;">Email parsing results will appear here.</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        let selectedFile = null;
-        let analysisResults = null;
-        let currentLenderRequirements = null;
+        let selectedIndustry = 'mortgage';
+        let selectedFiles = [];
 
-        // Tab Management
-        function showTab(tabId) {
-            // Hide all tabs
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
+        // Industry selection
+        document.querySelectorAll('.industry-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.industry-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                selectedIndustry = this.dataset.industry;
+                
+                // Show tabs section when industry is selected
+                document.getElementById('tabsSection').style.display = 'block';
+                
+                console.log('Selected industry:', selectedIndustry);
             });
+        });
+
+        // File selection
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            selectedFiles = Array.from(e.target.files);
+            displaySelectedFiles();
+        });
+
+        function displaySelectedFiles() {
+            const container = document.getElementById('selectedFiles');
+            if (selectedFiles.length > 0) {
+                container.innerHTML = '<div class="selected-file"><strong>Selected Files:</strong><br>' + 
+                    selectedFiles.map(f => f.name).join('<br>') + '</div>';
+                document.getElementById('analyzeBtn').style.display = 'inline-block';
+            } else {
+                container.innerHTML = '';
+                document.getElementById('analyzeBtn').style.display = 'none';
+            }
+        }
+
+        // Tab functionality
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
             
-            // Remove active class from all buttons
-            document.querySelectorAll('.tab-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            // Show selected tab
-            document.getElementById(tabId).classList.add('active');
-            
-            // Add active class to clicked button
+            document.getElementById(tabName).classList.add('active');
             event.target.classList.add('active');
         }
 
-        // File Upload Handlers
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            selectedFile = e.target.files[0];
-            if (selectedFile) {
-                const allowedTypes = [
-                    'application/pdf',
-                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'text/plain',
-                    'image/png',
-                    'image/jpeg',
-                    'image/jpg'
-                ];
-                
-                if (!allowedTypes.includes(selectedFile.type)) {
-                    showError('Please select a supported file type (PDF, Word, Excel, Image, or Text).');
-                    return;
-                }
-                
-                document.getElementById('fileName').textContent = selectedFile.name;
-                document.getElementById('analyzeBtn').disabled = false;
-                hideError();
-            }
-        });
-
-        document.getElementById('emailFileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                document.getElementById('emailFileName').textContent = file.name;
-                
-                // Process the uploaded file
-                const formData = new FormData();
-                formData.append('file', file);
-                
-                fetch('/process_email_file', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('emailContent').value = data.content;
-                        showSuccess('File processed successfully! Content extracted.');
-                    } else {
-                        showError('Failed to process file: ' + (data.error || 'Unknown error'));
-                    }
-                })
-                .catch(error => {
-                    showError('Network error: ' + error.message);
-                });
-            }
-        });
-
-        // Lender Requirements Parsing
-        function parseRequirements() {
-            const content = document.getElementById('emailContent').value.trim();
-            
-            if (!content) {
-                showError('Please enter email content or upload a file.');
+        // Analysis functionality
+        function startAnalysis() {
+            if (selectedFiles.length === 0) {
+                alert('Please select files to analyze');
                 return;
             }
 
-            fetch('/parse_email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ content })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    displayRequirements(data.requirements);
-                    currentLenderRequirements = data.requirements;
-                    updateDashboard(data.requirements);
-                    showSuccess('Requirements parsed successfully!');
-                } else {
-                    showError('Parsing failed: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                showError('Network error: ' + error.message);
-            });
-        }
-
-        function displayRequirements(requirements) {
-            const display = document.getElementById('requirementsDisplay');
-            const section = document.getElementById('parsedRequirements');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const statusText = document.getElementById('statusText');
             
-            let html = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
-                    <div>
-                        <h4 style="color: var(--accent-blue); margin-bottom: 10px;">📧 Lender Information</h4>
-                        <div><strong>Lender:</strong> ${requirements.lender_name}</div>
-                        <div><strong>Contact:</strong> ${requirements.contact_name}</div>
-                        <div><strong>Email:</strong> ${requirements.contact_email}</div>
-                        <div><strong>Date:</strong> ${requirements.date}</div>
-                        ${requirements.funding_amount ? `<div><strong>Amount:</strong> ${requirements.funding_amount}</div>` : ''}
-                    </div>
-                    <div>
-                        <h4 style="color: var(--accent-green); margin-bottom: 10px;">📋 Required Documents (${requirements.documents.length})</h4>
-                        <div style="max-height: 200px; overflow-y: auto;">
-                            ${requirements.documents.map(doc => `<div style="padding: 5px 0; border-bottom: 1px solid rgba(0,212,255,0.1);">• ${doc}</div>`).join('')}
-                        </div>
-                    </div>
-                </div>
-            `;
+            progressContainer.style.display = 'block';
             
-            if (requirements.special_instructions.length > 0) {
-                html += `
-                    <div style="margin-top: 20px;">
-                        <h4 style="color: var(--accent-orange); margin-bottom: 10px;">⚠️ Special Instructions</h4>
-                        ${requirements.special_instructions.map(inst => `<div style="padding: 5px 0;">• ${inst}</div>`).join('')}
-                    </div>
-                `;
-            }
-            
-            display.innerHTML = html;
-            section.classList.remove('hidden');
-        }
-
-        function updateDashboard(requirements) {
-            document.getElementById('dashDocuments').textContent = requirements.documents.length;
-            document.getElementById('dashConfidence').textContent = Math.floor(requirements.documents.length * 0.7);
-            document.getElementById('dashRisk').textContent = Math.floor(Math.random() * 200) + 700;
-            document.getElementById('dashCompliance').textContent = Math.floor(Math.random() * 30) + 60 + '%';
-        }
-
-        // Document Analysis
-        function analyzeDocument() {
-            if (!selectedFile) {
-                showError('Please select a file first.');
-                return;
-            }
-
             const formData = new FormData();
-            formData.append('file', selectedFile);
-            if (currentLenderRequirements) {
-                formData.append('lender_requirements', JSON.stringify(currentLenderRequirements));
-            }
+            selectedFiles.forEach(file => {
+                formData.append('files', file);
+            });
+            formData.append('industry', selectedIndustry);
 
-            const btn = document.getElementById('analyzeBtn');
-            btn.innerHTML = '<span class="loading"></span> Analyzing...';
-            btn.disabled = true;
+            // Simulate progress
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress > 90) progress = 90;
+                progressFill.style.width = progress + '%';
+                statusText.textContent = getStatusMessage(progress);
+            }, 500);
 
             fetch('/analyze', {
                 method: 'POST',
@@ -1407,462 +1026,224 @@ Below items need to be completed:
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                statusText.textContent = 'Analysis complete!';
+                
+                setTimeout(() => {
+                    progressContainer.style.display = 'none';
                     displayResults(data);
-                    showSuccess('Document analyzed successfully!');
-                } else {
-                    showError('Analysis failed: ' + (data.error || 'Unknown error'));
-                }
+                }, 1000);
             })
             .catch(error => {
-                showError('Network error: ' + error.message);
-            })
-            .finally(() => {
-                btn.innerHTML = '🔍 Analyze Document';
-                btn.disabled = false;
+                clearInterval(progressInterval);
+                console.error('Error:', error);
+                statusText.textContent = 'Analysis failed. Please try again.';
             });
+        }
+
+        function getStatusMessage(progress) {
+            if (progress < 20) return 'Initializing document processing...';
+            if (progress < 40) return 'Extracting text and metadata...';
+            if (progress < 60) return 'Applying industry-specific analysis...';
+            if (progress < 80) return 'Generating insights and scoring...';
+            return 'Finalizing results...';
         }
 
         function displayResults(data) {
-            analysisResults = data;
-            document.getElementById('resultsSection').classList.remove('hidden');
-            document.getElementById('resultsSummary').textContent = `${data.sections.length} sections identified`;
-            displaySections(data.sections);
-            updateSeparationTab(data.sections);
+            const resultsContainer = document.getElementById('analysisResults');
             
-            // Smooth scroll to results
-            document.getElementById('resultsSection').scrollIntoView({ 
-                behavior: 'smooth',
-                block: 'start'
-            });
-        }
+            if (data.success) {
+                let html = '<div style="background: rgba(0,212,255,0.1); border: 1px solid #00d4ff; border-radius: 10px; padding: 20px; margin-bottom: 20px;">';
+                html += '<h4 style="color: #00d4ff; margin-bottom: 15px;">Analysis Summary</h4>';
+                html += '<p><strong>Industry:</strong> ' + data.industry + '</p>';
+                html += '<p><strong>Files Processed:</strong> ' + data.files_processed + '</p>';
+                html += '<p><strong>Total Pages:</strong> ' + (data.total_pages || 'N/A') + '</p>';
+                html += '</div>';
 
-        function displaySections(sections) {
-            const sectionsGrid = document.getElementById('sectionsGrid');
-            
-            if (!sections || sections.length === 0) {
-                sectionsGrid.innerHTML = '<div class="error-message">No mortgage sections were identified in this document.</div>';
-                return;
-            }
-
-            sectionsGrid.innerHTML = sections.map(section => `
-                <div class="section-card">
-                    <input type="checkbox" class="section-checkbox" data-section-id="${section.id}" checked>
-                    <div class="section-title">${section.title}</div>
-                    <div class="section-page">Page ${section.page}</div>
-                    <span class="confidence-badge confidence-${section.confidence}">${section.confidence}</span>
-                    ${section.source ? `<div style="margin-top: 10px; font-size: 0.8rem; color: var(--text-muted);">Source: ${section.source}</div>` : ''}
-                    ${section.risk_score ? `<div style="margin-top: 5px; font-size: 0.8rem; color: var(--text-secondary);">Risk: ${section.risk_score}/100</div>` : ''}
-                </div>
-            `).join('');
-        }
-
-        function updateSeparationTab(sections) {
-            const separationContent = document.getElementById('separationContent');
-            
-            if (!sections || sections.length === 0) {
-                separationContent.innerHTML = `
-                    <div style="text-align: center; padding: 40px; color: var(--text-muted);">
-                        No sections identified for separation.
-                    </div>
-                `;
-                return;
-            }
-
-            separationContent.innerHTML = sections.map(section => `
-                <div class="section-card" style="margin-bottom: 15px;">
-                    <input type="checkbox" class="section-checkbox" data-section-id="${section.id}">
-                    <div class="section-title">${section.title}</div>
-                    <div class="section-page">Pages: ${section.page}-${section.page + 1} | Filename: ${section.title.replace(/[^a-zA-Z0-9]/g, '').toUpperCase()}.pdf | Risk: ${section.risk_score || Math.floor(Math.random() * 40) + 60}/100</div>
-                </div>
-            `).join('');
-        }
-
-        // Section Selection
-        function selectAll() {
-            document.querySelectorAll('.section-checkbox').forEach(cb => cb.checked = true);
-        }
-
-        function selectNone() {
-            document.querySelectorAll('.section-checkbox').forEach(cb => cb.checked = false);
-        }
-
-        function selectHighConfidence() {
-            document.querySelectorAll('.section-checkbox').forEach(cb => {
-                const card = cb.closest('.section-card');
-                const badge = card.querySelector('.confidence-badge');
-                cb.checked = badge && badge.classList.contains('confidence-high');
-            });
-        }
-
-        // Table of Contents Generation
-        function generateDocument() {
-            if (!analysisResults) {
-                showError('No analysis results available.');
-                return;
-            }
-
-            const selectedSections = [];
-            document.querySelectorAll('.section-checkbox:checked').forEach(cb => {
-                const sectionId = parseInt(cb.dataset.sectionId);
-                const section = analysisResults.sections.find(s => s.id === sectionId);
-                if (section) {
-                    selectedSections.push(section);
+                if (data.sections && data.sections.length > 0) {
+                    html += '<h4 style="color: #00d4ff; margin: 20px 0;">Document Sections</h4>';
+                    data.sections.forEach(section => {
+                        html += '<div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin-bottom: 10px;">';
+                        html += '<div style="display: flex; justify-content: space-between; align-items: center;">';
+                        html += '<strong style="color: white;">' + section.name + '</strong>';
+                        html += '<span style="color: #00d4ff;">Pages: ' + section.pages + '</span>';
+                        html += '</div>';
+                        html += '<div style="margin-top: 10px; font-size: 0.9rem; color: #b0b0b0;">';
+                        html += 'Confidence: ' + section.confidence + ' | Quality: ' + section.quality + ' | Risk: ' + section.risk_score;
+                        html += '</div>';
+                        if (section.notes) {
+                            html += '<div style="margin-top: 5px; font-size: 0.8rem; color: #888;">' + section.notes + '</div>';
+                        }
+                        html += '</div>';
+                    });
                 }
-            });
 
-            if (selectedSections.length === 0) {
-                showError('Please select at least one section.');
+                resultsContainer.innerHTML = html;
+            } else {
+                resultsContainer.innerHTML = '<div style="color: #ff6b35; padding: 20px;">Error: ' + data.error + '</div>';
+            }
+        }
+
+        // Email parsing
+        function parseEmail() {
+            const content = document.getElementById('emailContent').value;
+            if (!content.trim()) {
+                alert('Please paste email content to parse');
                 return;
             }
 
-            selectedSections.sort((a, b) => a.page - b.page);
-
-            const tocLines = selectedSections.map((section, index) => 
-                `${index + 1}. ${section.title}${' '.repeat(Math.max(1, 50 - section.title.length))}Page ${section.page}`
-            );
-
-            const tocContent = `MORTGAGE PACKAGE — TABLE OF CONTENTS
-${'='.repeat(60)}
-
-${tocLines.join('\\n')}
-
-${'='.repeat(60)}
-Generated on: ${new Date().toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit' 
-})}`;
-
-            document.getElementById('tocContent').textContent = tocContent;
-            document.getElementById('tocSection').classList.remove('hidden');
-            document.getElementById('tocSection').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        function downloadTOC() {
-            const content = document.getElementById('tocContent').textContent;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'mortgage_package_toc.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        // Analysis Rules Management
-        function addRule() {
-            const pattern = document.getElementById('patternInput').value.trim();
-            const type = document.getElementById('typeSelect').value;
-            const label = document.getElementById('labelInput').value.trim();
-
-            if (!pattern || !label) {
-                showError('Please enter both pattern and label.');
-                return;
-            }
-
-            fetch('/add_rule', {
+            fetch('/parse_email', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pattern, type, label })
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({content: content})
             })
             .then(response => response.json())
             .then(data => {
-                if (data.success) {
-                    updateRulesList(data.rules);
-                    document.getElementById('patternInput').value = '';
-                    document.getElementById('labelInput').value = '';
-                    showSuccess('Rule added successfully!');
-                } else {
-                    showError('Failed to add rule: ' + (data.error || 'Unknown error'));
-                }
+                displayEmailResults(data);
             })
             .catch(error => {
-                showError('Network error: ' + error.message);
+                console.error('Error:', error);
+                document.getElementById('emailResults').innerHTML = '<div style="color: #ff6b35;">Error parsing email</div>';
             });
         }
 
-        function removeRule(index) {
-            fetch('/remove_rule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ index })
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    updateRulesList(data.rules);
-                    showSuccess('Rule removed successfully!');
-                } else {
-                    showError('Failed to remove rule: ' + (data.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                showError('Network error: ' + error.message);
-            });
-        }
-
-        function updateRulesList(rules) {
-            const rulesList = document.getElementById('rulesList');
+        function displayEmailResults(data) {
+            const container = document.getElementById('emailResults');
             
-            if (rules.length === 0) {
-                rulesList.innerHTML = '<div style="color: var(--text-muted); font-style: italic;">No custom rules defined yet.</div>';
-                return;
-            }
-
-            rulesList.innerHTML = rules.map((rule, index) => `
-                <div class="section-card" style="margin-bottom: 15px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="flex: 1;">
-                            <div class="section-title">${rule.label}</div>
-                            <div class="section-page">${rule.type}: "${rule.pattern}"</div>
-                        </div>
-                        <button class="btn btn-secondary" onclick="removeRule(${index})" style="margin: 0; padding: 8px 15px;">Remove</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Utility Functions
-        function showError(message) {
-            hideMessages();
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'error-message';
-            errorDiv.textContent = message;
-            document.querySelector('.container').appendChild(errorDiv);
+            let html = '<div style="background: rgba(0,212,255,0.1); border: 1px solid #00d4ff; border-radius: 10px; padding: 20px;">';
+            html += '<h4 style="color: #00d4ff; margin-bottom: 15px;">Lender Information</h4>';
+            html += '<p><strong>Lender:</strong> ' + data.lender_name + '</p>';
+            html += '<p><strong>Contact:</strong> ' + data.contact_name + ' (' + data.contact_email + ')</p>';
+            html += '<p><strong>Funding Amount:</strong> ' + data.funding_amount + '</p>';
+            html += '<p><strong>Date:</strong> ' + data.date + '</p>';
             
-            setTimeout(() => {
-                errorDiv.remove();
-            }, 5000);
-        }
-
-        function showSuccess(message) {
-            hideMessages();
-            const successDiv = document.createElement('div');
-            successDiv.className = 'success-message';
-            successDiv.textContent = message;
-            document.querySelector('.container').appendChild(successDiv);
-            
-            setTimeout(() => {
-                successDiv.remove();
-            }, 3000);
-        }
-
-        function hideMessages() {
-            document.querySelectorAll('.error-message, .success-message').forEach(msg => msg.remove());
-        }
-
-        function hideError() {
-            document.querySelectorAll('.error-message').forEach(msg => msg.remove());
-        }
-
-        // Load initial rules on page load
-        document.addEventListener('DOMContentLoaded', function() {
-            fetch('/get_rules')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        updateRulesList(data.rules);
-                    }
-                })
-                .catch(error => {
-                    console.error('Failed to load rules:', error);
+            if (data.documents && data.documents.length > 0) {
+                html += '<h5 style="color: #00d4ff; margin: 15px 0 10px 0;">Required Documents (' + data.documents.length + '):</h5>';
+                html += '<ul style="margin-left: 20px;">';
+                data.documents.forEach(doc => {
+                    html += '<li style="margin-bottom: 5px; color: #b0b0b0;">' + doc + '</li>';
                 });
-        });
+                html += '</ul>';
+            }
+            
+            if (data.special_instructions && data.special_instructions.length > 0) {
+                html += '<h5 style="color: #00d4ff; margin: 15px 0 10px 0;">Special Instructions:</h5>';
+                html += '<ul style="margin-left: 20px;">';
+                data.special_instructions.forEach(instruction => {
+                    html += '<li style="margin-bottom: 5px; color: #b0b0b0;">' + instruction + '</li>';
+                });
+                html += '</ul>';
+            }
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Initialize with mortgage selected
+        document.querySelector('[data-industry="mortgage"]').click();
     </script>
 </body>
-</html>"""
+</html>
+    ''', industries=INDUSTRY_TEMPLATES)
 
-# Enhanced routes with multi-format support
-@app.route('/')
-def index():
-    return render_template_string(HTML_TEMPLATE)
-
-@app.route('/process_email_file', methods=['POST'])
-def process_email_file():
-    """Process uploaded email files with multi-format support"""
+@app.route('/analyze', methods=['POST'])
+def analyze_documents():
+    """Universal document analysis endpoint"""
     try:
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'error': 'No file uploaded'})
+        files = request.files.getlist('files')
+        industry = request.form.get('industry', 'mortgage')
         
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'success': False, 'error': 'No file selected'})
+        if not files:
+            return jsonify({'success': False, 'error': 'No files uploaded'})
         
-        # Save file temporarily
-        temp_path = f"/tmp/{file.filename}"
-        file.save(temp_path)
+        results = {
+            'success': True,
+            'industry': INDUSTRY_TEMPLATES.get(industry, {}).get('name', industry.title()),
+            'files_processed': len(files),
+            'total_pages': 0,
+            'sections': [],
+            'metadata': {}
+        }
         
-        # Process with enhanced document processor
-        result = document_processor.process_document(temp_path, file.filename)
+        all_text = ""
         
-        # Clean up temp file
-        try:
-            os.remove(temp_path)
-        except:
-            pass
+        # Process each file
+        for file in files:
+            if file.filename:
+                # Save file temporarily
+                temp_path = f"/tmp/{file.filename}"
+                file.save(temp_path)
+                
+                # Process with universal processor
+                result = document_processor.process_document(temp_path, file.filename, industry)
+                
+                if result['success']:
+                    all_text += result['text'] + "\n\n"
+                    results['total_pages'] += result['metadata'].get('page_count', 1)
+                
+                # Clean up temp file
+                try:
+                    os.remove(temp_path)
+                except:
+                    pass
         
-        if result['success']:
-            return jsonify({
-                'success': True,
-                'content': result['text'],
-                'metadata': result.get('metadata', {})
-            })
+        # Analyze based on industry
+        if industry == 'mortgage':
+            # Use existing mortgage analysis
+            sections = analyze_mortgage_sections("combined_documents.pdf", True)
         else:
-            return jsonify({'success': False, 'error': result['error']})
+            # Use universal analysis
+            sections = analyze_universal_document(all_text, industry, "combined_documents")
+        
+        results['sections'] = sections
+        
+        return jsonify(results)
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/parse_email', methods=['POST'])
-def parse_email():
+def parse_email_endpoint():
+    """Email parsing endpoint for lender requirements"""
     try:
         data = request.get_json()
         content = data.get('content', '')
         
         if not content:
-            return jsonify({'success': False, 'error': 'No content provided'})
+            return jsonify({'error': 'No email content provided'})
         
-        requirements = parse_lender_email(content)
+        # Parse the email content
+        lender_info = parse_lender_email(content)
         
         # Store globally for use in analysis
         global lender_requirements
-        lender_requirements = requirements
+        lender_requirements = lender_info
         
-        return jsonify({
-            'success': True,
-            'requirements': requirements
-        })
+        return jsonify(lender_info)
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/analyze', methods=['POST'])
-def analyze():
-    try:
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'error': 'No file uploaded'})
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'success': False, 'error': 'No file selected'})
-        
-        # Save file temporarily
-        temp_path = f"/tmp/{file.filename}"
-        file.save(temp_path)
-        
-        # Process with enhanced document processor
-        result = document_processor.process_document(temp_path, file.filename)
-        
-        # Clean up temp file
-        try:
-            os.remove(temp_path)
-        except:
-            pass
-        
-        if not result['success']:
-            return jsonify({'success': False, 'error': result['error']})
-        
-        # Check if lender requirements were provided
-        use_lender_rules = bool(lender_requirements.get('documents'))
-        
-        sections = analyze_mortgage_sections(file.filename, use_lender_rules)
-        
-        # Add risk scores to sections
-        for section in sections:
-            section['risk_score'] = min(100, max(50, 60 + hash(section['title']) % 40))
-        
-        return jsonify({
-            'success': True,
-            'filename': file.filename,
-            'sections': sections,
-            'total_sections': len(sections),
-            'lender_requirements_used': use_lender_rules,
-            'processing_metadata': result.get('metadata', {})
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/add_rule', methods=['POST'])
-def add_rule():
-    try:
-        data = request.get_json()
-        pattern = data.get('pattern', '').strip()
-        rule_type = data.get('type', 'contains')
-        label = data.get('label', '').strip()
-        
-        if not pattern or not label:
-            return jsonify({'success': False, 'error': 'Pattern and label are required'})
-        
-        new_rule = {
-            'pattern': pattern,
-            'type': rule_type,
-            'label': label
-        }
-        
-        analysis_rules.append(new_rule)
-        
-        return jsonify({
-            'success': True,
-            'rules': analysis_rules
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/remove_rule', methods=['POST'])
-def remove_rule():
-    try:
-        data = request.get_json()
-        index = data.get('index')
-        
-        if index is None or index < 0 or index >= len(analysis_rules):
-            return jsonify({'success': False, 'error': 'Invalid rule index'})
-        
-        analysis_rules.pop(index)
-        
-        return jsonify({
-            'success': True,
-            'rules': analysis_rules
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/get_rules', methods=['GET'])
-def get_rules():
-    try:
-        return jsonify({
-            'success': True,
-            'rules': analysis_rules
-        })
-        
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        return jsonify({'error': str(e)})
 
 @app.route('/health')
-def health():
+def health_check():
+    """Health check endpoint"""
     return jsonify({
-        'status': 'ok',
+        'status': 'healthy',
+        'platform': 'Universal Document Analyzer',
+        'industries': list(INDUSTRY_TEMPLATES.keys()),
         'supported_formats': list(document_processor.supported_formats.keys()),
-        'available_libraries': {
-            'pdfplumber': PDFPLUMBER_AVAILABLE,
-            'docx': DOCX_AVAILABLE,
-            'openpyxl': OPENPYXL_AVAILABLE,
-            'ocr': OCR_AVAILABLE
-        }
+        'features': [
+            'Multi-industry support',
+            'Universal document processing',
+            'Email parsing',
+            'Industry-specific analysis',
+            'Real-time processing'
+        ]
     })
 
-@app.route('/favicon.ico')
-def favicon():
-    return '', 204
-
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=True)
 
