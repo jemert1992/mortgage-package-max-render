@@ -101,6 +101,30 @@ def parse_lender_email(email_content):
             doc_text = re.sub(r'\s+', ' ', doc_text)  # Normalize whitespace
             doc_text = doc_text.strip('.,;()[]')
             
+            # Fix common OCR/encoding character substitutions
+            char_fixes = {
+                'Ɵ': 'ti',  # ƟnstrucƟons → Instructions
+                'Ʃ': 'tt',  # SeƩlement → Settlement  
+                'ƫ': 'ti',  # Alternative encoding
+                'ƭ': 'ti',  # Alternative encoding
+                'Ƭ': 'Ti',  # Alternative encoding
+                'ƫ': 'ti',  # NoƟce → Notice
+                'ƭ': 'ti',  # LeƩer → Letter
+                'Ɵ': 'ti',  # NoƟficaƟon → Notification
+                'Ɵ': 'ti'   # AnƟ-Coercion → Anti-Coercion
+            }
+            
+            for bad_char, good_char in char_fixes.items():
+                doc_text = doc_text.replace(bad_char, good_char)
+            
+            # Additional common fixes
+            doc_text = doc_text.replace('InstrucƟons', 'Instructions')
+            doc_text = doc_text.replace('NoƟce', 'Notice')
+            doc_text = doc_text.replace('SeƩlement', 'Settlement')
+            doc_text = doc_text.replace('LeƩer', 'Letter')
+            doc_text = doc_text.replace('NoƟficaƟon', 'Notification')
+            doc_text = doc_text.replace('AnƟ-Coercion', 'Anti-Coercion')
+            
             # Filter out very short items and section headers
             if (len(doc_text) > 5 and 
                 not doc_text.lower().startswith(('all ', 'below ', 'please ', 'guard against')) and
