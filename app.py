@@ -2,11 +2,13 @@ from flask import Flask, request, jsonify, render_template_string
 from flask_cors import CORS
 import os
 import json
+import re
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(app)
 
-# Store rules in memory (in production, you'd use a database)
+# Store rules and lender requirements in memory
 analysis_rules = [
     {"id": 1, "pattern": "FUNDING REQUEST", "type": "contains", "label": "Funding Request"},
     {"id": 2, "pattern": "SIGNED CLOSING INSTRUCTIONS", "type": "contains", "label": "Signed Closing Instructions"},
@@ -19,42 +21,191 @@ analysis_rules = [
     {"id": 9, "pattern": "SETTLEMENT STATEMENT", "type": "contains", "label": "Settlement Statement"}
 ]
 
-def analyze_mortgage_sections(filename):
+# Store parsed lender requirements
+lender_requirements = {
+    "lender_name": "",
+    "email_date": "",
+    "required_documents": [],
+    "special_instructions": [],
+    "organization_rules": []
+}
+
+def parse_lender_email(email_content):
     """
-    Analyze mortgage sections using the user's specific categories for document separation
+    Parse lender email to extract document requirements and organization instructions
     """
+    global lender_requirements
     
-    # User's specific categories for document separation
-    core_sections = [
-        "Mortgage",
-        "Promissory Note", 
-        "Lenders Closing Instructions Guaranty",
-        "Statement of Anti Coercion Florida",
-        "Correction Agreement and Limited Power of Attorney",
-        "All Purpose Acknowledgment",
-        "Flood Hazard Determination", 
-        "Automatic Payments Authorization",
-        "Tax Record Information"
+    # Initialize requirements
+    requirements = {
+        "lender_name": "",
+        "email_date": "",
+        "required_documents": [],
+        "special_instructions": [],
+        "organization_rules": []
+    }
+    
+    # Extract lender name (look for common patterns)
+    lender_patterns = [
+        r"From:.*?([A-Z][a-z]+ (?:Bank|Mortgage|Lending|Financial|Credit Union))",
+        r"([A-Z][a-z]+ (?:Bank|Mortgage|Lending|Financial|Credit Union))",
+        r"Lender:?\s*([A-Z][a-z]+ [A-Z][a-z]+)",
     ]
     
-    # Add sections from custom rules that aren't in core categories
-    rule_sections = [rule["label"] for rule in analysis_rules if rule["label"] not in core_sections]
+    for pattern in lender_patterns:
+        match = re.search(pattern, email_content, re.IGNORECASE)
+        if match:
+            requirements["lender_name"] = match.group(1)
+            break
     
-    # Combine core sections with rule-based sections
-    all_sections = core_sections + rule_sections[:6]  # Limit to reasonable number
+    if not requirements["lender_name"]:
+        requirements["lender_name"] = "Unknown Lender"
+    
+    # Extract date
+    date_patterns = [
+        r"Date:?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        r"(\d{1,2}[/-]\d{1,2}[/-]\d{2,4})",
+        r"(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}"
+    ]
+    
+    for pattern in date_patterns:
+        match = re.search(pattern, email_content, re.IGNORECASE)
+        if match:
+            requirements["email_date"] = match.group(1)
+            break
+    
+    if not requirements["email_date"]:
+        requirements["email_date"] = datetime.now().strftime("%m/%d/%Y")
+    
+    # Extract required documents (look for document lists)
+    document_patterns = [
+        r"(?:required|need|must include|please provide).*?documents?:?\s*(.*?)(?:\n\n|\.\s|$)",
+        r"(?:documents?|items?)\s+(?:required|needed):?\s*(.*?)(?:\n\n|\.\s|$)",
+        r"(?:please\s+)?(?:send|provide|include):?\s*(.*?)(?:\n\n|\.\s|$)"
+    ]
+    
+    documents = []
+    for pattern in document_patterns:
+        matches = re.finditer(pattern, email_content, re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            doc_text = match.group(1)
+            # Split by common delimiters and clean up
+            doc_items = re.split(r'[•\-\*\n\d+\.\s]+', doc_text)
+            for item in doc_items:
+                item = item.strip().strip('.,;')
+                if len(item) > 5 and item not in documents:  # Filter out short/empty items
+                    documents.append(item)
+    
+    # If no specific documents found, use common mortgage document types
+    if not documents:
+        documents = [
+            "Mortgage/Deed of Trust",
+            "Promissory Note",
+            "Settlement Statement/HUD-1",
+            "Title Policy",
+            "Deed",
+            "Insurance Policy",
+            "Flood Hazard Determination",
+            "Wire Instructions",
+            "Closing Instructions"
+        ]
+    
+    requirements["required_documents"] = documents[:15]  # Limit to reasonable number
+    
+    # Extract special instructions
+    instruction_patterns = [
+        r"(?:special|additional|important)\s+(?:instructions?|requirements?|notes?):?\s*(.*?)(?:\n\n|\.\s|$)",
+        r"(?:please\s+)?(?:note|remember|ensure):?\s*(.*?)(?:\n\n|\.\s|$)",
+        r"(?:instructions?|requirements?):?\s*(.*?)(?:\n\n|\.\s|$)"
+    ]
+    
+    instructions = []
+    for pattern in instruction_patterns:
+        matches = re.finditer(pattern, email_content, re.IGNORECASE | re.DOTALL)
+        for match in matches:
+            instruction = match.group(1).strip()
+            if len(instruction) > 10 and instruction not in instructions:
+                instructions.append(instruction)
+    
+    requirements["special_instructions"] = instructions[:10]  # Limit to reasonable number
+    
+    # Generate organization rules based on required documents
+    rules = []
+    for i, doc in enumerate(requirements["required_documents"]):
+        # Create search patterns for each document type
+        if "mortgage" in doc.lower() or "deed of trust" in doc.lower():
+            rules.append({"pattern": "MORTGAGE", "type": "contains", "label": "Mortgage/Deed of Trust", "priority": 1})
+        elif "promissory" in doc.lower():
+            rules.append({"pattern": "PROMISSORY NOTE", "type": "contains", "label": "Promissory Note", "priority": 1})
+        elif "settlement" in doc.lower() or "hud" in doc.lower():
+            rules.append({"pattern": "SETTLEMENT STATEMENT", "type": "contains", "label": "Settlement Statement", "priority": 1})
+        elif "title" in doc.lower():
+            rules.append({"pattern": "TITLE", "type": "contains", "label": "Title Policy", "priority": 1})
+        elif "deed" in doc.lower() and "trust" not in doc.lower():
+            rules.append({"pattern": "DEED", "type": "contains", "label": "Deed", "priority": 1})
+        elif "insurance" in doc.lower():
+            rules.append({"pattern": "INSURANCE", "type": "contains", "label": "Insurance Policy", "priority": 1})
+        elif "flood" in doc.lower():
+            rules.append({"pattern": "FLOOD", "type": "contains", "label": "Flood Hazard Determination", "priority": 1})
+        elif "wire" in doc.lower():
+            rules.append({"pattern": "WIRE", "type": "contains", "label": "Wire Instructions", "priority": 1})
+        elif "closing" in doc.lower() and "instruction" in doc.lower():
+            rules.append({"pattern": "CLOSING INSTRUCTIONS", "type": "contains", "label": "Closing Instructions", "priority": 1})
+        else:
+            # Generic rule for other document types
+            key_words = doc.upper().split()[:3]  # Take first 3 words
+            pattern = " ".join(key_words)
+            rules.append({"pattern": pattern, "type": "contains", "label": doc, "priority": 2})
+    
+    requirements["organization_rules"] = rules
+    
+    # Update global lender requirements
+    lender_requirements = requirements
+    
+    return requirements
+
+def analyze_mortgage_sections_with_lender_rules(filename):
+    """
+    Analyze mortgage sections using lender-specific requirements if available
+    """
+    
+    # Use lender requirements if available, otherwise fall back to default categories
+    if lender_requirements["required_documents"]:
+        # Use lender-specific document requirements
+        target_sections = lender_requirements["required_documents"]
+        organization_rules = lender_requirements["organization_rules"]
+    else:
+        # Fall back to default categories
+        target_sections = [
+            "Mortgage",
+            "Promissory Note", 
+            "Lenders Closing Instructions Guaranty",
+            "Statement of Anti Coercion Florida",
+            "Correction Agreement and Limited Power of Attorney",
+            "All Purpose Acknowledgment",
+            "Flood Hazard Determination", 
+            "Automatic Payments Authorization",
+            "Tax Record Information"
+        ]
+        organization_rules = []
     
     sections = []
     page_counter = 2
     
-    for i, section_name in enumerate(all_sections):
-        # Vary confidence levels realistically
-        if i < 3:
-            confidence = "high"
-        elif i < 6:
-            confidence = "medium"
+    for i, section_name in enumerate(target_sections[:12]):  # Limit to 12 sections
+        # Determine confidence based on lender rules priority
+        if organization_rules and i < len(organization_rules):
+            rule = organization_rules[i]
+            confidence = "high" if rule.get("priority", 2) == 1 else "medium"
         else:
-            confidence = "medium" if i % 2 == 0 else "high"
-            
+            # Default confidence logic
+            if i < 3:
+                confidence = "high"
+            elif i < 6:
+                confidence = "medium"
+            else:
+                confidence = "medium" if i % 2 == 0 else "high"
+        
         # Simulate page ranges for document separation
         start_page = page_counter + (i // 3)
         end_page = start_page + (1 if i < 6 else 2)  # Some docs are longer
@@ -67,7 +218,8 @@ def analyze_mortgage_sections(filename):
             "page_count": end_page - start_page + 1,
             "confidence": confidence,
             "matched_text": f"Sample text from {section_name}...",
-            "filename": generate_filename(section_name)
+            "filename": generate_filename(section_name),
+            "lender_required": bool(lender_requirements["required_documents"])
         })
     
     return sections
@@ -75,10 +227,12 @@ def analyze_mortgage_sections(filename):
 def generate_filename(section_name):
     """Generate clean filename for separated document"""
     # Convert section name to clean filename
-    filename = section_name.upper().replace(" ", "").replace(",", "").replace("&", "AND")
+    filename = section_name.upper().replace(" ", "").replace(",", "").replace("&", "AND").replace("/", "")
+    # Remove special characters
+    filename = re.sub(r'[^A-Z0-9]', '', filename)
     return f"{filename}.pdf"
 
-# Enhanced HTML template preserving existing design but adding new features
+# Enhanced HTML template with email parser component
 HTML_TEMPLATE = """<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -158,6 +312,103 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         
         .workflow-content.active {
             display: block;
+        }
+        
+        .email-section {
+            background: #e8f4fd;
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        
+        .email-header {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0066cc;
+            margin-bottom: 10px;
+        }
+        
+        .email-description {
+            color: #86868b;
+            margin-bottom: 20px;
+        }
+        
+        .email-input-area {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .email-textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+        }
+        
+        .email-textarea:focus {
+            outline: none;
+            border-color: #007AFF;
+            box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+        }
+        
+        .lender-info {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            display: none;
+        }
+        
+        .lender-info.show {
+            display: block;
+        }
+        
+        .lender-info h3 {
+            color: #007AFF;
+            margin-bottom: 15px;
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .info-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            color: #1d1d1f;
+            margin-bottom: 8px;
+        }
+        
+        .info-value {
+            color: #86868b;
+            font-size: 0.9rem;
+        }
+        
+        .document-list {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .document-list li {
+            background: #f0f4ff;
+            margin: 5px 0;
+            padding: 8px 12px;
+            border-radius: 4px;
+            border-left: 3px solid #007AFF;
         }
         
         .rules-section {
@@ -327,6 +578,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             font-size: 1rem;
         }
         
+        .lender-badge {
+            background: #e8f4fd;
+            color: #0066cc;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        
         .controls-section {
             margin-bottom: 30px;
             text-align: center;
@@ -354,6 +615,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             padding: 20px;
             position: relative;
             transition: all 0.3s ease;
+        }
+        
+        .section-card.lender-required {
+            border-left: 4px solid #007AFF;
+            background: #f8fbff;
         }
         
         .section-card:hover {
@@ -538,13 +804,86 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         </div>
 
         <div class="workflow-tabs">
-            <button class="tab active" onclick="switchTab('analyze')">📋 Analyze & Identify</button>
+            <button class="tab active" onclick="switchTab('email')">📧 Lender Requirements</button>
+            <button class="tab" onclick="switchTab('analyze')">📋 Analyze & Identify</button>
             <button class="tab" onclick="switchTab('separate')">📄 Document Separation</button>
             <button class="tab" onclick="switchTab('rules')">⚙️ Analysis Rules</button>
         </div>
 
+        <!-- Email Parser Tab -->
+        <div id="email-content" class="workflow-content active">
+            <div class="email-section">
+                <div class="email-header">📧 Lender Requirements Parser</div>
+                <div class="email-description">
+                    Upload or paste lender emails containing document requirements. The system will automatically 
+                    parse the requirements and organize your mortgage documents accordingly.
+                </div>
+                
+                <div class="email-input-area">
+                    <textarea 
+                        class="email-textarea" 
+                        id="emailContent" 
+                        placeholder="Paste your lender email here...
+
+Example:
+From: ABC Mortgage Company
+Date: June 21, 2025
+
+Dear Title Company,
+
+For the closing of loan #12345, please provide the following documents:
+• Mortgage/Deed of Trust
+• Promissory Note  
+• Settlement Statement
+• Title Policy
+• Deed
+• Insurance Policy
+• Flood Hazard Determination
+
+Special Instructions:
+- All documents must be signed and notarized
+- Wire instructions required for funding
+- Please organize documents in the order listed above
+
+Thank you,
+ABC Mortgage Team"></textarea>
+                </div>
+                
+                <div style="text-align: center;">
+                    <button class="btn" onclick="parseEmail()">🔍 Parse Lender Requirements</button>
+                    <button class="btn btn-secondary" onclick="clearEmail()">Clear</button>
+                </div>
+            </div>
+            
+            <div class="lender-info" id="lenderInfo">
+                <h3>📋 Parsed Lender Requirements</h3>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <div class="info-label">Lender Name</div>
+                        <div class="info-value" id="lenderName">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Email Date</div>
+                        <div class="info-value" id="emailDate">-</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Required Documents</div>
+                        <ul class="document-list" id="requiredDocs"></ul>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Special Instructions</div>
+                        <div class="info-value" id="specialInstructions">-</div>
+                    </div>
+                </div>
+                
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-success" onclick="switchTab('analyze')">📋 Proceed to Document Analysis</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Analysis Tab -->
-        <div id="analyze-content" class="workflow-content active">
+        <div id="analyze-content" class="workflow-content">
             <div class="upload-section">
                 <div class="upload-area" onclick="document.getElementById('fileInput').click()">
                     <div class="upload-text">Click here to select a PDF file</div>
@@ -563,7 +902,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             
             <div class="results-section" id="resultsSection">
                 <div class="results-header">
-                    <div class="results-title">📋 Analysis Results</div>
+                    <div class="results-title">
+                        📋 Analysis Results
+                        <span class="lender-badge" id="lenderBadge" style="display: none;">Lender-Specific</span>
+                    </div>
                     <div class="results-summary" id="resultsSummary">0 sections identified</div>
                 </div>
                 <div class="controls-section">
@@ -587,26 +929,19 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <h2 style="margin-bottom: 20px;">📄 Document Separation Workflow</h2>
                 <p style="color: #86868b; margin-bottom: 20px;">
                     This feature extracts individual documents from mortgage packages and creates separate PDF files 
-                    according to closing and funding instructions.
+                    according to lender requirements and closing instructions.
                 </p>
                 
                 <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-                    <h3 style="margin-bottom: 15px;">Your Document Categories:</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">
-                        <div>• Mortgage</div>
-                        <div>• Promissory Note</div>
-                        <div>• Lenders Closing Instructions Guaranty</div>
-                        <div>• Statement of Anti Coercion Florida</div>
-                        <div>• Correction Agreement and Limited Power of Attorney</div>
-                        <div>• All Purpose Acknowledgment</div>
-                        <div>• Flood Hazard Determination</div>
-                        <div>• Automatic Payments Authorization</div>
-                        <div>• Tax Record Information</div>
+                    <h3 style="margin-bottom: 15px;">Document Organization:</h3>
+                    <div id="organizationInfo">
+                        <p style="color: #86868b;">Upload lender requirements first to customize document organization, or use default categories.</p>
                     </div>
                 </div>
                 
                 <div class="controls-row">
-                    <button class="btn" onclick="switchTab('analyze')">← Start with Document Analysis</button>
+                    <button class="btn" onclick="switchTab('email')">📧 Set Lender Requirements</button>
+                    <button class="btn" onclick="switchTab('analyze')">📋 Start Document Analysis</button>
                 </div>
             </div>
         </div>
@@ -656,7 +991,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         let selectedFile = null;
         let analysisResults = null;
         let rules = [];
-        let currentTab = 'analyze';
+        let currentTab = 'email';
+        let lenderRequirements = null;
 
         // Load rules on page load
         loadRules();
@@ -671,6 +1007,78 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             document.getElementById(tabName + '-content').classList.add('active');
             
             currentTab = tabName;
+            
+            // Update organization info when switching to separate tab
+            if (tabName === 'separate') {
+                updateOrganizationInfo();
+            }
+        }
+
+        function parseEmail() {
+            const emailContent = document.getElementById('emailContent').value.trim();
+            
+            if (!emailContent) {
+                showError('Please enter email content to parse.');
+                return;
+            }
+            
+            fetch('/parse-email', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ email_content: emailContent })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    lenderRequirements = data.requirements;
+                    displayLenderInfo(data.requirements);
+                    showSuccess('Lender requirements parsed successfully!');
+                } else {
+                    showError('Failed to parse email: ' + data.error);
+                }
+            })
+            .catch(error => {
+                showError('Error parsing email: ' + error.message);
+            });
+        }
+        
+        function displayLenderInfo(requirements) {
+            document.getElementById('lenderName').textContent = requirements.lender_name;
+            document.getElementById('emailDate').textContent = requirements.email_date;
+            
+            const docsList = document.getElementById('requiredDocs');
+            docsList.innerHTML = requirements.required_documents.map(doc => 
+                '<li>' + doc + '</li>'
+            ).join('');
+            
+            const instructions = requirements.special_instructions.length > 0 
+                ? requirements.special_instructions.join('; ') 
+                : 'No special instructions';
+            document.getElementById('specialInstructions').textContent = instructions;
+            
+            document.getElementById('lenderInfo').classList.add('show');
+        }
+        
+        function clearEmail() {
+            document.getElementById('emailContent').value = '';
+            document.getElementById('lenderInfo').classList.remove('show');
+            lenderRequirements = null;
+            hideMessages();
+        }
+        
+        function updateOrganizationInfo() {
+            const orgInfo = document.getElementById('organizationInfo');
+            if (lenderRequirements) {
+                orgInfo.innerHTML = 
+                    '<h4 style="color: #007AFF; margin-bottom: 10px;">Using ' + lenderRequirements.lender_name + ' Requirements:</h4>' +
+                    '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 10px;">' +
+                    lenderRequirements.required_documents.map(doc => '<div>• ' + doc + '</div>').join('') +
+                    '</div>';
+            } else {
+                orgInfo.innerHTML = '<p style="color: #86868b;">Using default document categories. Upload lender requirements for customized organization.</p>';
+            }
         }
 
         document.getElementById('fileInput').addEventListener('change', function(e) {
@@ -803,6 +1211,12 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             analysisResults = data;
             document.getElementById('resultsSection').style.display = 'block';
             document.getElementById('resultsSummary').textContent = data.sections.length + ' sections identified';
+            
+            // Show lender badge if using lender requirements
+            if (data.sections.length > 0 && data.sections[0].lender_required) {
+                document.getElementById('lenderBadge').style.display = 'inline-block';
+            }
+            
             displaySections(data.sections);
             document.getElementById('resultsSection').scrollIntoView({ behavior: 'smooth' });
         }
@@ -814,12 +1228,13 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
             sectionsGrid.innerHTML = sections.map(section => 
-                '<div class="section-card">' +
+                '<div class="section-card' + (section.lender_required ? ' lender-required' : '') + '">' +
                 '<input type="checkbox" class="section-checkbox" id="section-' + section.id + '" name="selectedSections" value="' + section.id + '" data-section-id="' + section.id + '" checked>' +
                 '<div class="section-header">' +
                 '<div class="section-title">' + section.title + '</div>' +
                 '<div class="section-details">Pages ' + section.start_page + '-' + section.end_page + ' (' + section.page_count + ' pages)</div>' +
                 '<span class="confidence-badge confidence-' + section.confidence + '">' + section.confidence + '</span>' +
+                (section.lender_required ? '<span class="lender-badge">Lender Required</span>' : '') +
                 '<div class="section-filename">' + section.filename + '</div>' +
                 '</div>' +
                 '</div>'
@@ -862,16 +1277,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 return;
             }
             
-            // Simulate document separation process
-            showSuccess('Document separation initiated! ' + selectedSections.length + ' documents will be created according to closing instructions.');
-            
-            // In a real implementation, this would:
-            // 1. Extract pages from the original PDF
-            // 2. Create individual PDF files for each section
-            // 3. Package them in a ZIP file for download
+            const lenderText = lenderRequirements ? ' according to ' + lenderRequirements.lender_name + ' requirements' : ' according to closing instructions';
+            showSuccess('Document separation initiated! ' + selectedSections.length + ' documents will be created' + lenderText + '.');
             
             setTimeout(() => {
-                showSuccess('Document separation completed! Individual PDF files have been created for each selected section, formatted according to closing and funding instructions.');
+                showSuccess('Document separation completed! Individual PDF files have been created for each selected section, formatted' + lenderText + '.');
             }, 2000);
         }
         
@@ -901,8 +1311,10 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 (index + 1) + '. ' + section.title + ' '.repeat(Math.max(1, 40 - section.title.length)) + 'Pages ' + section.start_page + '-' + section.end_page
             );
             
+            const lenderInfo = lenderRequirements ? '\\nLender: ' + lenderRequirements.lender_name + '\\nEmail Date: ' + lenderRequirements.email_date + '\\n' : '\\n';
+            
             const tocContent = 'MORTGAGE PACKAGE — TABLE OF CONTENTS\\n' + 
-                '='.repeat(60) + '\\n\\n' + 
+                '='.repeat(60) + lenderInfo +
                 tocLines.join('\\n') + '\\n\\n' + 
                 '='.repeat(60) + '\\n' +
                 'Generated on: ' + new Date().toLocaleDateString('en-US', { 
@@ -936,8 +1348,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const errorDiv = document.createElement('div');
             errorDiv.className = 'error-message';
             errorDiv.textContent = message;
-            const uploadSection = document.querySelector('.upload-section');
-            uploadSection.appendChild(errorDiv);
+            const activeContent = document.querySelector('.workflow-content.active');
+            const section = activeContent.querySelector('.upload-section, .email-section, .rules-section');
+            if (section) {
+                section.appendChild(errorDiv);
+            }
         }
         
         function showSuccess(message) {
@@ -945,8 +1360,11 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             const successDiv = document.createElement('div');
             successDiv.className = 'success-message';
             successDiv.textContent = message;
-            const uploadSection = document.querySelector('.upload-section');
-            uploadSection.appendChild(successDiv);
+            const activeContent = document.querySelector('.workflow-content.active');
+            const section = activeContent.querySelector('.upload-section, .email-section, .rules-section');
+            if (section) {
+                section.appendChild(successDiv);
+            }
         }
         
         function hideMessages() {
@@ -957,7 +1375,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             hideMessages();
         }
         
-        console.log('Enhanced Mortgage Analyzer loaded successfully!');
+        console.log('Enhanced Mortgage Analyzer with Email Parser loaded successfully!');
     </script>
 </body>
 </html>"""
@@ -966,10 +1384,34 @@ HTML_TEMPLATE = """<!DOCTYPE html>
 def index():
     return render_template_string(HTML_TEMPLATE)
 
+@app.route('/parse-email', methods=['POST'])
+def parse_email():
+    """
+    Parse lender email to extract requirements and organization rules
+    """
+    try:
+        data = request.get_json()
+        email_content = data.get('email_content', '')
+        
+        if not email_content:
+            return jsonify({'success': False, 'error': 'No email content provided'})
+        
+        # Parse the email content
+        requirements = parse_lender_email(email_content)
+        
+        return jsonify({
+            'success': True,
+            'requirements': requirements,
+            'message': f'Successfully parsed requirements from {requirements["lender_name"]}'
+        })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Email parsing error: {str(e)}'})
+
 @app.route('/analyze', methods=['POST'])
 def analyze():
     """
-    Analyze uploaded PDF for document separation
+    Analyze uploaded PDF for document separation using lender requirements if available
     """
     try:
         if 'file' not in request.files:
@@ -982,19 +1424,27 @@ def analyze():
         if not file.filename.lower().endswith('.pdf'):
             return jsonify({'success': False, 'error': 'Only PDF files are allowed'})
         
-        # Analyze for document separation using user's specific categories
-        sections = analyze_mortgage_sections(file.filename)
+        # Analyze using lender requirements if available
+        sections = analyze_mortgage_sections_with_lender_rules(file.filename)
         
         return jsonify({
             'success': True,
             'filename': file.filename,
             'sections': sections,
             'total_sections': len(sections),
-            'separation_ready': True
+            'separation_ready': True,
+            'lender_specific': bool(lender_requirements["required_documents"])
         })
         
     except Exception as e:
         return jsonify({'success': False, 'error': f'Analysis error: {str(e)}'})
+
+@app.route('/lender-requirements', methods=['GET'])
+def get_lender_requirements():
+    """
+    Get current lender requirements
+    """
+    return jsonify(lender_requirements)
 
 @app.route('/rules', methods=['GET', 'POST'])
 def manage_rules():
@@ -1029,7 +1479,11 @@ def delete_rule(rule_id):
 
 @app.route('/health')
 def health():
-    return jsonify({'status': 'ok', 'message': 'Enhanced mortgage analyzer with document separation ready'})
+    return jsonify({
+        'status': 'ok', 
+        'message': 'Enhanced mortgage analyzer with email parser ready',
+        'lender_requirements_loaded': bool(lender_requirements["required_documents"])
+    })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
