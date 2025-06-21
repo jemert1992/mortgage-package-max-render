@@ -200,20 +200,6 @@ INDUSTRY_TEMPLATES = {
         }
     }
 }
-            'Bank Statements', 'Investment Reports', 'Financial Statements', 'Tax Documents',
-            'Loan Applications', 'Credit Reports', 'Insurance Policies', 'Audit Reports'
-        ]
-    },
-    'hr': {
-        'name': 'Human Resources',
-        'icon': '👥',
-        'description': 'Employee records, resumes, HR documents, onboarding',
-        'categories': [
-            'Resumes', 'Employee Records', 'Performance Reviews', 'Job Applications',
-            'Onboarding Documents', 'Training Records', 'Benefits Information', 'Payroll Documents'
-        ]
-    }
-}
 
 def clean_text(text):
     """Enhanced text cleaning for OCR and encoding issues"""
