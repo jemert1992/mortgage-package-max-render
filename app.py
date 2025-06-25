@@ -1601,10 +1601,43 @@ def index():
                 }
             }
 
-            // Show upload section when step 2 is reached
+            // Update step 2 content based on workflow progress
+            const step2 = document.getElementById('step2');
+            const step2Content = step2.querySelector('span');
+            
             if (mortgageWorkflowStep >= 2) {
+                // Enable step 2 - show upload button
+                step2Content.innerHTML = '<button onclick="showUploadSection()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Upload Documents</button>';
+                
+                // Show upload section
                 document.getElementById('universalUpload').classList.add('show');
+            } else {
+                // Disable step 2
+                step2Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Step 1 first</span>';
+                document.getElementById('universalUpload').classList.remove('show');
             }
+
+            // Update step 3 content based on workflow progress
+            const step3 = document.getElementById('step3');
+            const step3Content = step3.querySelector('span');
+            
+            if (mortgageWorkflowStep >= 3) {
+                // Enable step 3 - show analyze button
+                step3Content.innerHTML = '<button onclick="startMortgageAnalysis()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Start Analysis</button>';
+            } else {
+                // Disable step 3
+                step3Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Steps 1-2 first</span>';
+            }
+        }
+
+        function showUploadSection() {
+            // Scroll to upload section
+            document.getElementById('universalUpload').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function startMortgageAnalysis() {
+            // Start the analysis for mortgage workflow
+            startAnalysis();
         }
 
         function showEmailParser() {
@@ -1655,6 +1688,12 @@ def index():
             });
             
             displaySelectedFiles();
+            
+            // Advance mortgage workflow to step 3 when files are uploaded
+            if (selectedIndustry === 'mortgage' && selectedFiles.length > 0 && mortgageWorkflowStep === 2) {
+                mortgageWorkflowStep = 3;
+                updateMortgageWorkflow();
+            }
         }
 
         function displaySelectedFiles() {
@@ -2153,5 +2192,5 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5007, debug=True)
+    app.run(host='0.0.0.0', port=5008, debug=True)
 
