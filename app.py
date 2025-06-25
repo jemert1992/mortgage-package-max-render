@@ -1610,11 +1610,20 @@ def index():
                 step2Content.innerHTML = '<button onclick="showUploadSection()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Upload Documents</button>';
                 
                 // Show upload section
-                document.getElementById('universalUpload').classList.add('show');
+                const uploadSection = document.getElementById('universalUpload');
+                if (uploadSection) {
+                    uploadSection.classList.add('show');
+                    console.log('Upload section shown for mortgage workflow step 2');
+                } else {
+                    console.error('Upload section element not found');
+                }
             } else {
                 // Disable step 2
                 step2Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Step 1 first</span>';
-                document.getElementById('universalUpload').classList.remove('show');
+                const uploadSection = document.getElementById('universalUpload');
+                if (uploadSection) {
+                    uploadSection.classList.remove('show');
+                }
             }
 
             // Update step 3 content based on workflow progress
@@ -1631,8 +1640,17 @@ def index():
         }
 
         function showUploadSection() {
-            // Scroll to upload section
-            document.getElementById('universalUpload').scrollIntoView({ behavior: 'smooth' });
+            // Ensure upload section is visible first
+            const uploadSection = document.getElementById('universalUpload');
+            if (uploadSection) {
+                uploadSection.classList.add('show');
+                // Small delay to ensure the element is rendered before scrolling
+                setTimeout(() => {
+                    uploadSection.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+            } else {
+                console.error('Upload section not found');
+            }
         }
 
         function startMortgageAnalysis() {
@@ -2192,5 +2210,5 @@ def health_check():
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5008, debug=True)
+    app.run(host='0.0.0.0', port=5009, debug=True)
 
