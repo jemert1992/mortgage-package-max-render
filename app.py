@@ -1564,12 +1564,19 @@ def index():
                 if (selectedIndustry === 'mortgage') {
                     // Show mortgage workflow
                     document.getElementById('mortgageWorkflow').style.display = 'block';
-                    document.getElementById('universalUpload').style.display = 'none';
+                    // Don't hide upload section with inline style - let CSS classes control it
+                    const uploadSection = document.getElementById('universalUpload');
+                    uploadSection.classList.remove('show');
+                    // Clear any inline styles that might interfere
+                    uploadSection.style.display = '';
                     updateMortgageWorkflow();
                 } else {
                     // Show universal upload for other industries
                     document.getElementById('mortgageWorkflow').style.display = 'none';
-                    document.getElementById('universalUpload').classList.add('show');
+                    const uploadSection = document.getElementById('universalUpload');
+                    uploadSection.classList.add('show');
+                    // Clear any inline styles that might interfere
+                    uploadSection.style.display = '';
                 }
                 
                 // Show tabs section when industry is selected
@@ -1581,6 +1588,8 @@ def index():
 
         // Mortgage workflow functions
         function updateMortgageWorkflow() {
+            console.log('updateMortgageWorkflow called, step:', mortgageWorkflowStep);
+            
             // Reset all steps
             document.querySelectorAll('.workflow-step').forEach(step => {
                 step.classList.remove('active', 'completed');
@@ -1605,21 +1614,33 @@ def index():
             const step2 = document.getElementById('step2');
             const step2Content = step2.querySelector('span');
             
+            console.log('Step 2 element found:', !!step2);
+            console.log('Step 2 span found:', !!step2Content);
+            
             if (mortgageWorkflowStep >= 2) {
+                console.log('Enabling step 2 - creating upload button');
                 // Enable step 2 - show upload button
-                step2Content.innerHTML = '<button onclick="showUploadSection()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Upload Documents</button>';
+                if (step2Content) {
+                    step2Content.innerHTML = '<button onclick="showUploadSection()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Upload Documents</button>';
+                    console.log('Upload Documents button created');
+                } else {
+                    console.error('Step 2 span element not found');
+                }
                 
                 // Show upload section
                 const uploadSection = document.getElementById('universalUpload');
                 if (uploadSection) {
                     uploadSection.classList.add('show');
                     console.log('Upload section shown for mortgage workflow step 2');
+                    console.log('Upload section classes:', uploadSection.className);
                 } else {
                     console.error('Upload section element not found');
                 }
             } else {
                 // Disable step 2
-                step2Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Step 1 first</span>';
+                if (step2Content) {
+                    step2Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Step 1 first</span>';
+                }
                 const uploadSection = document.getElementById('universalUpload');
                 if (uploadSection) {
                     uploadSection.classList.remove('show');
@@ -1632,21 +1653,38 @@ def index():
             
             if (mortgageWorkflowStep >= 3) {
                 // Enable step 3 - show analyze button
-                step3Content.innerHTML = '<button onclick="startMortgageAnalysis()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Start Analysis</button>';
+                if (step3Content) {
+                    step3Content.innerHTML = '<button onclick="startMortgageAnalysis()" style="background: #ff6b35; color: white; border: none; padding: 8px 16px; border-radius: 20px; cursor: pointer;">Start Analysis</button>';
+                }
             } else {
                 // Disable step 3
-                step3Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Steps 1-2 first</span>';
+                if (step3Content) {
+                    step3Content.innerHTML = '<span style="color: #888; font-size: 0.9rem;">Complete Steps 1-2 first</span>';
+                }
             }
         }
 
         function showUploadSection() {
+            console.log('showUploadSection called');
+            
             // Ensure upload section is visible first
             const uploadSection = document.getElementById('universalUpload');
+            console.log('Upload section element found:', !!uploadSection);
+            
             if (uploadSection) {
+                console.log('Upload section classes before:', uploadSection.className);
                 uploadSection.classList.add('show');
+                console.log('Upload section classes after:', uploadSection.className);
+                
+                // Check if element is actually visible
+                const computedStyle = window.getComputedStyle(uploadSection);
+                console.log('Upload section display style:', computedStyle.display);
+                
                 // Small delay to ensure the element is rendered before scrolling
                 setTimeout(() => {
+                    console.log('Attempting to scroll to upload section');
                     uploadSection.scrollIntoView({ behavior: 'smooth' });
+                    console.log('Scroll command executed');
                 }, 100);
             } else {
                 console.error('Upload section not found');
