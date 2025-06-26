@@ -21,7 +21,7 @@ try:
     OPENAI_AVAILABLE = True
     
     # Production-ready API key handling - supports both environment variables and hardcoded values
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY') or "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"
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY') or "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"
     
     # Production-safe client initialization with comprehensive error handling
     openai_client = None
@@ -31,13 +31,14 @@ try:
         """Get OpenAI client with robust initialization and error handling"""
         global openai_client, openai_client_error
         
-        if openai_client is not None:
-            return openai_client
-            
-        if openai_client_error is not None:
-            # Don't keep trying if we already failed
-            return None
-            
+        # Force fresh initialization - clear any cached client
+        openai_client = None
+        openai_client_error = None
+        
+        # Debug: Show what API key we're using (last 4 chars for security)
+        key_suffix = OPENAI_API_KEY[-4:] if OPENAI_API_KEY else "None"
+        print(f"🔑 Attempting OpenAI initialization with key ending in: {key_suffix}")
+        
         try:
             # Method 1: Direct initialization with API key
             openai_client = OpenAI(api_key=OPENAI_API_KEY)
@@ -3825,6 +3826,7 @@ def debug_openai():
         debug_info = {
             'openai_available': OPENAI_AVAILABLE,
             'api_key_present': bool(OPENAI_API_KEY),
+            'api_key_suffix': OPENAI_API_KEY[-4:] if OPENAI_API_KEY else 'None',
             'api_key_source': 'environment' if os.getenv('OPENAI_API_KEY') else 'hardcoded',
             'api_key_length': len(OPENAI_API_KEY) if OPENAI_API_KEY else 0,
             'client_error': openai_client_error,
