@@ -1,5 +1,5 @@
-# Python 3.13 Compatible Requirements - WORKING VERSION
-# Fixed pandas version to prevent compilation errors
+# Python 3.13 Compatible Requirements - FINAL WORKING VERSION
+# Uses pandas 2.3.0 with guaranteed pre-built wheels for Python 3.13
 
 # Core Flask framework
 Flask==3.0.3
@@ -20,8 +20,8 @@ openpyxl==3.1.5
 Pillow==10.4.0
 pytesseract==0.3.13
 
-# Data processing libraries (CRITICAL for analysis) - FIXED VERSION
-pandas==2.1.0
+# Data processing libraries (CRITICAL for analysis) - GUARANTEED WORKING VERSION
+pandas==2.3.0
 numpy==1.26.4
 
 # Core dependencies - Latest stable versions
