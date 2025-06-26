@@ -20,10 +20,10 @@ try:
     OPENAI_AVAILABLE = True
     
     # CACHE BUSTER - Force fresh deployment
-    DEPLOYMENT_TIMESTAMP = "2025-06-26-13-15-OS-SCOPING-FIX"
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-17-25-NEW-API-KEY-FRESH-START"
     
     # UPDATED API KEY - Force new key recognition
-    NEW_OPENAI_API_KEY = "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"
+    NEW_OPENAI_API_KEY = "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"
     
     # Production-ready API key handling - check multiple possible environment variable names
     env_key = (os.getenv('OPENAI_API_KEY') or 
@@ -58,17 +58,40 @@ try:
         openai_client_error = None
         
         # DYNAMIC API KEY RETRIEVAL - Always check environment first
-        current_api_key = (os.getenv('OPENAI_API_KEY') or 
-                          os.getenv('OPENAI_KEY') or 
-                          os.getenv('OPEN_AI_KEY') or 
-                          os.getenv('API_KEY') or
+        env_openai_api_key = os.getenv('OPENAI_API_KEY')
+        env_openai_key = os.getenv('OPENAI_KEY')
+        env_open_ai_key = os.getenv('OPEN_AI_KEY')
+        env_api_key = os.getenv('API_KEY')
+        
+        # Debug: Show what we found in environment variables
+        print(f"🔍 ENV DEBUG:")
+        print(f"   OPENAI_API_KEY: {'Found' if env_openai_api_key else 'Not found'}")
+        print(f"   OPENAI_KEY: {'Found' if env_openai_key else 'Not found'}")
+        print(f"   OPEN_AI_KEY: {'Found' if env_open_ai_key else 'Not found'}")
+        print(f"   API_KEY: {'Found' if env_api_key else 'Not found'}")
+        
+        current_api_key = (env_openai_api_key or 
+                          env_openai_key or 
+                          env_open_ai_key or 
+                          env_api_key or
                           NEW_OPENAI_API_KEY)
         
         # Debug: Show what API key we're using (last 4 chars for security)
         key_suffix = current_api_key[-4:] if current_api_key else "None"
-        env_source = 'environment' if (os.getenv('OPENAI_API_KEY') or os.getenv('OPENAI_KEY') or os.getenv('OPEN_AI_KEY') or os.getenv('API_KEY')) else 'hardcoded'
+        env_source = 'environment' if (env_openai_api_key or env_openai_key or env_open_ai_key or env_api_key) else 'hardcoded'
         print(f"🔑 Attempting OpenAI initialization with key ending in: {key_suffix}")
         print(f"🌍 KEY SOURCE: {env_source}")
+        
+        # Show which specific env var was used
+        if env_source == 'environment':
+            if env_openai_api_key:
+                print(f"   Using OPENAI_API_KEY (ends with: {env_openai_api_key[-4:]})")
+            elif env_openai_key:
+                print(f"   Using OPENAI_KEY (ends with: {env_openai_key[-4:]})")
+            elif env_open_ai_key:
+                print(f"   Using OPEN_AI_KEY (ends with: {env_open_ai_key[-4:]})")
+            elif env_api_key:
+                print(f"   Using API_KEY (ends with: {env_api_key[-4:]})")
         
         try:
             # Method 1: Direct initialization with API key
