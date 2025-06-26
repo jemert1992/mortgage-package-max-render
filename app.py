@@ -20,7 +20,7 @@ try:
     OPENAI_AVAILABLE = True
     
     # CACHE BUSTER - Force fresh deployment
-    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-10-DATETIME-FIX"
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-20-DYNAMIC-API-KEY-FIX"
     
     # UPDATED API KEY - Force new key recognition
     NEW_OPENAI_API_KEY = "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"
@@ -57,13 +57,22 @@ try:
         openai_client = None
         openai_client_error = None
         
+        # DYNAMIC API KEY RETRIEVAL - Always check environment first
+        current_api_key = (os.getenv('OPENAI_API_KEY') or 
+                          os.getenv('OPENAI_KEY') or 
+                          os.getenv('OPEN_AI_KEY') or 
+                          os.getenv('API_KEY') or
+                          NEW_OPENAI_API_KEY)
+        
         # Debug: Show what API key we're using (last 4 chars for security)
-        key_suffix = OPENAI_API_KEY[-4:] if OPENAI_API_KEY else "None"
+        key_suffix = current_api_key[-4:] if current_api_key else "None"
+        env_source = 'environment' if (os.getenv('OPENAI_API_KEY') or os.getenv('OPENAI_KEY') or os.getenv('OPEN_AI_KEY') or os.getenv('API_KEY')) else 'hardcoded'
         print(f"🔑 Attempting OpenAI initialization with key ending in: {key_suffix}")
+        print(f"🌍 KEY SOURCE: {env_source}")
         
         try:
             # Method 1: Direct initialization with API key
-            openai_client = OpenAI(api_key=OPENAI_API_KEY)
+            openai_client = OpenAI(api_key=current_api_key)
             
             # Test the client with a minimal request to verify it works
             test_response = openai_client.chat.completions.create(
@@ -83,7 +92,7 @@ try:
             try:
                 # Method 2: Environment variable approach
                 import os
-                os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+                os.environ["OPENAI_API_KEY"] = current_api_key
                 openai_client = OpenAI()
                 
                 # Test this client too
