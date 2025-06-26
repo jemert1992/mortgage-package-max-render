@@ -1,13 +1,12 @@
 from flask import Flask, request, jsonify, render_template_string, send_file
 from flask_cors import CORS
-import datetime
+from datetime import datetime
 import re
 import json
 import base64
 import os
 import tempfile
 import shutil
-from datetime import datetime as dt
 
 # OpenAI integration with cost optimization
 # Define constants first (before try block to avoid NameError)
@@ -21,10 +20,10 @@ try:
     OPENAI_AVAILABLE = True
     
     # CACHE BUSTER - Force fresh deployment
-    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-00-FORCE-REFRESH"
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-10-DATETIME-FIX"
     
     # UPDATED API KEY - Force new key recognition
-    NEW_OPENAI_API_KEY = "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"
+    NEW_OPENAI_API_KEY = "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"
     
     # Production-ready API key handling - check multiple possible environment variable names
     env_key = (os.getenv('OPENAI_API_KEY') or 
@@ -213,7 +212,7 @@ def handle_not_found(e):
 # Basic health endpoint that always works
 @app.route('/basic_health')
 def basic_health():
-    return jsonify({'status': 'Flask app running', 'timestamp': str(datetime.datetime.now())})
+    return jsonify({'status': 'Flask app running', 'timestamp': str(datetime.now())})
 
 # Initialize CORS after app creation
 try:
