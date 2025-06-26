@@ -12,14 +12,16 @@ MODEL_NAME = "gpt-4o-mini"  # Much cheaper than gpt-4o
 MAX_INPUT_TOKENS = 8000  # Limit input size
 
 try:
-    import openai
+    from openai import OpenAI
     OPENAI_AVAILABLE = True
     # Cost-optimized settings
     OPENAI_API_KEY = "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"
-    openai.api_key = OPENAI_API_KEY
+    # Initialize OpenAI client (v1.x style)
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
     
 except ImportError:
     OPENAI_AVAILABLE = False
+    openai_client = None
     print("OpenAI not available - install with: pip install openai")
 
 # Free document processing libraries - with graceful fallback
@@ -435,7 +437,7 @@ Provide a JSON response with:
 
 Keep response concise to minimize costs."""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -489,7 +491,7 @@ Return JSON with:
 
 Be concise to minimize costs."""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,  # Small response for cost control
@@ -538,7 +540,7 @@ Provide a JSON response with:
 
 Common mortgage document types: Mortgage, Promissory Note, Closing Instructions, Anti Coercion Statement, Power of Attorney, Acknowledgment, Flood Hazard, Automatic Payments, Tax Records"""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -579,7 +581,7 @@ Provide a JSON response with:
 4. compliance_score: Overall compliance percentage (0-100)
 5. recommendations: Specific suggestions for improvement"""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -625,7 +627,7 @@ Provide a JSON response with:
 3. confidence_score: Confidence in the ordering (0-100)
 4. alternative_orders: Other viable ordering options"""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -667,7 +669,7 @@ Provide a JSON response with:
 5. recommendations: Suggestions for improvement
 6. risk_assessment: Low/Medium/High risk level"""
 
-            response = openai.chat.completions.create(
+            response = openai_client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
