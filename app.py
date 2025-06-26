@@ -20,8 +20,31 @@ try:
     import os
     OPENAI_AVAILABLE = True
     
-    # Production-ready API key handling - supports both environment variables and hardcoded values
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY') or "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"
+    # CACHE BUSTER - Force fresh deployment
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-00-FORCE-REFRESH"
+    
+    # UPDATED API KEY - Force new key recognition
+    NEW_OPENAI_API_KEY = "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"
+    
+    # Production-ready API key handling - check multiple possible environment variable names
+    env_key = (os.getenv('OPENAI_API_KEY') or 
+               os.getenv('OPENAI_KEY') or 
+               os.getenv('OPEN_AI_KEY') or 
+               os.getenv('API_KEY'))
+    
+    OPENAI_API_KEY = env_key or NEW_OPENAI_API_KEY
+    
+    # Debug: Print environment variable info at startup
+    print(f"🔑 STARTUP: API key ends with: {OPENAI_API_KEY[-4:] if OPENAI_API_KEY else 'None'}")
+    print(f"🌍 ENV SOURCE: {'environment' if env_key else 'hardcoded'}")
+    print(f"📅 DEPLOYMENT: {DEPLOYMENT_TIMESTAMP}")
+    
+    # Debug: Show available environment variables that might contain API keys
+    env_vars = [k for k in os.environ.keys() if 'API' in k.upper() or 'OPENAI' in k.upper()]
+    if env_vars:
+        print(f"🔍 FOUND ENV VARS: {env_vars}")
+    else:
+        print("⚠️  NO API-related environment variables found")
     
     # Production-safe client initialization with comprehensive error handling
     openai_client = None
