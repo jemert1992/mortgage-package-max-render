@@ -6,17 +6,17 @@ import json
 from datetime import datetime
 
 # OpenAI integration with cost optimization
+# Define constants first (before try block to avoid NameError)
+MAX_TOKENS_PER_REQUEST = 1000  # Keep costs low
+MODEL_NAME = "gpt-4o-mini"  # Much cheaper than gpt-4o
+MAX_INPUT_TOKENS = 8000  # Limit input size
+
 try:
     import openai
     OPENAI_AVAILABLE = True
     # Cost-optimized settings
     OPENAI_API_KEY = "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"
     openai.api_key = OPENAI_API_KEY
-    
-    # Cost control settings
-    MAX_TOKENS_PER_REQUEST = 1000  # Keep costs low
-    MODEL_NAME = "gpt-4o-mini"  # Much cheaper than gpt-4o
-    MAX_INPUT_TOKENS = 8000  # Limit input size
     
 except ImportError:
     OPENAI_AVAILABLE = False
