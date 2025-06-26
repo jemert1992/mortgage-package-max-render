@@ -1,17 +1,69 @@
 from flask import Flask, request, jsonify, render_template_string, send_file
 from flask_cors import CORS
 from datetime import datetime
+import gc  # For memory management
 import re
 import json
 import base64
 import os
 import tempfile
 import shutil
-
 # OpenAI integration with cost optimization
 # Define constants first (before try block to avoid NameError)
 MAX_TOKENS_PER_REQUEST = 1000  # Keep costs low
-MODEL_NAME = "gpt-4o-mini"  # Much cheaper than gpt-4o
+MODEL_NAME = "gpt-4o-mini"  # Most cost-effective model
+
+# MEMORY OPTIMIZATION FUNCTIONS
+def truncate_text_content(data, max_length=1000):
+    """Truncate text content to prevent memory issues"""
+    if isinstance(data, dict):
+        result = {}
+        for key, value in data.items():
+            if key in ['content', 'text', 'extracted_text'] and isinstance(value, str):
+                # Truncate long text content
+                result[key] = value[:max_length] + "..." if len(value) > max_length else value
+            elif isinstance(value, (dict, list)):
+                result[key] = truncate_text_content(value, max_length)
+            else:
+                result[key] = value
+        return result
+    elif isinstance(data, list):
+        return [truncate_text_content(item, max_length) for item in data]
+    else:
+        return data
+
+def memory_safe_ai_call(client, prompt, max_tokens=500):
+    """Make AI call with memory safety measures"""
+    try:
+        # Limit prompt size to prevent memory issues
+        if len(prompt) > 8000:  # Approximately 2000 tokens
+            prompt = prompt[:8000] + "\n\n[Content truncated for memory safety]"
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",  # Use smaller model
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=max_tokens,  # Limit response size
+            temperature=0.1
+        )
+        
+        # Force garbage collection after AI call
+        gc.collect()
+        
+        return response
+        
+    except Exception as e:
+        # Force cleanup on error
+        gc.collect()
+        raise e
+
+def get_memory_usage():
+    """Get current memory usage in MB"""
+    try:
+        import psutil
+        process = psutil.Process()
+        return process.memory_info().rss / 1024 / 1024  # MB
+    except:
+        return 0
 MAX_INPUT_TOKENS = 8000  # Limit input size
 
 try:
@@ -20,7 +72,7 @@ try:
     OPENAI_AVAILABLE = True
     
     # CACHE BUSTER - Force fresh deployment
-    DEPLOYMENT_TIMESTAMP = "2025-06-26-17-35-SECURITY-FIX-ENV-ONLY"
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-18-55-MEMORY-OPTIMIZATION"
     
     # NO HARDCODED API KEY - Environment variables only for security
     # OpenAI automatically disables keys exposed in code
@@ -954,37 +1006,36 @@ Common mortgage document types: Mortgage, Promissory Note, Closing Instructions,
             return {"error": f"AI analysis failed: {str(e)}", "ai_analysis": False}
     
     def match_documents_to_requirements(self, separated_documents, lender_requirements):
-        """Match separated documents to lender requirements using AI"""
+        """Memory-safe version of document matching"""
         if not OPENAI_AVAILABLE:
             return {"error": "OpenAI not available", "ai_analysis": False}
         
         try:
-            prompt = f"""Match these separated documents to lender requirements and suggest optimal organization:
+            print(f"🧠 Memory before processing: {get_memory_usage():.1f} MB")
+            
+            # Truncate large content to prevent memory issues
+            safe_documents = truncate_text_content(separated_documents, max_length=500)
+            safe_requirements = truncate_text_content(lender_requirements, max_length=1000)
+            
+            prompt = f"""Match these documents to requirements (content truncated for processing):
 
-Separated Documents:
-{json.dumps(separated_documents, indent=2)}
+Documents: {json.dumps(safe_documents[:10], indent=1)}
+Requirements: {json.dumps(safe_requirements, indent=1)}
 
-Lender Requirements:
-{json.dumps(lender_requirements, indent=2)}
-
-Provide a JSON response with:
-1. document_matches: Array of objects with document_name, requirement_match, confidence_score
-2. suggested_order: Optimal order for the reorganized PDF
-3. missing_documents: Documents required but not found
-4. compliance_score: Overall compliance percentage (0-100)
-5. recommendations: Specific suggestions for improvement"""
+Provide JSON response with:
+1. document_matches: [{{document_name, requirement_match, confidence_score}}]
+2. suggested_order: [document names in optimal order]
+3. compliance_score: 0-100
+4. recommendations: [brief suggestions]"""
 
             # Get OpenAI client with error handling
             client = get_openai_client()
             if not client:
                 return {"error": "OpenAI client not available", "ai_analysis": False}
 
-            response = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=MAX_TOKENS_PER_REQUEST,
-                temperature=0.1
-            )
+            response = memory_safe_ai_call(client, prompt, max_tokens=800)
+            
+            print(f"🧠 Memory after AI call: {get_memory_usage():.1f} MB")
             
             tokens_used = response.usage.total_tokens
             self.total_tokens_used += tokens_used
@@ -992,12 +1043,12 @@ Provide a JSON response with:
             return {
                 "ai_analysis": True,
                 "matching_result": response.choices[0].message.content,
-                "tokens_used": tokens_used,
-                "total_tokens": self.total_tokens_used
+                "tokens_used": tokens_used
             }
             
         except Exception as e:
-            return {"error": f"AI matching failed: {str(e)}", "ai_analysis": False}
+            gc.collect()  # Cleanup on error
+            return {"error": f"Memory-safe matching failed: {str(e)}", "ai_analysis": False}
     
     def determine_optimal_order(self, matched_documents, lender_preferences=None):
         """Determine optimal document order using AI"""
@@ -3547,9 +3598,14 @@ def parse_email():
 
 @app.route('/reorganize_pdf', methods=['POST'])
 def reorganize_pdf():
-    """AI-powered PDF reorganization endpoint"""
+    """AI-powered PDF reorganization endpoint with memory optimization"""
     try:
+        print(f"🧠 Memory at start: {get_memory_usage():.1f} MB")
+        
         global pdf_reorganizer_ai, pdf_reorganizer
+        
+        # Force garbage collection at start
+        gc.collect()
         
         # Check if required components are available, try to reinitialize if needed
         if not pdf_reorganizer_ai:
@@ -3579,11 +3635,22 @@ def reorganize_pdf():
         if not pdf_reorganizer:
             return jsonify({'success': False, 'error': 'PDF generation not available'})
         
-        # Get request data
+        # Get request data with memory safety
         data = request.get_json()
         document_sections = data.get('document_sections', [])
         lender_requirements = data.get('lender_requirements', {})
         original_pdf_path = data.get('original_pdf_path', '')
+        
+        # Limit data size to prevent memory issues
+        if len(document_sections) > 20:
+            document_sections = document_sections[:20]
+            print("⚠️  Limited document sections to 20 for memory safety")
+        
+        # Truncate large text content
+        document_sections = truncate_text_content(document_sections, max_length=500)
+        lender_requirements = truncate_text_content(lender_requirements, max_length=1000)
+        
+        print(f"🧠 Memory after data processing: {get_memory_usage():.1f} MB")
         
         if not document_sections:
             return jsonify({'success': False, 'error': 'No document sections provided'})
@@ -3650,9 +3717,17 @@ def reorganize_pdf():
             'generation_timestamp': datetime.now().isoformat()
         }
         
+        # Force memory cleanup before returning
+        gc.collect()
+        print(f"🧠 Memory at end: {get_memory_usage():.1f} MB")
+        
         return jsonify(response_data)
         
     except Exception as e:
+        # Force cleanup on error
+        gc.collect()
+        print(f"❌ Error in reorganize_pdf: {str(e)}")
+        print(f"🧠 Memory after error: {get_memory_usage():.1f} MB")
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/download_pdf/<filename>')
