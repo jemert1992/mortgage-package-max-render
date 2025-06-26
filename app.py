@@ -16,13 +16,50 @@ try:
     OPENAI_AVAILABLE = True
     # Cost-optimized settings
     OPENAI_API_KEY = "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"
-    # Initialize OpenAI client (v1.x style)
-    openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    
+    # Deployment-safe client initialization with comprehensive error handling
+    openai_client = None
+    
+    def get_openai_client():
+        """Get OpenAI client with lazy initialization and error handling"""
+        global openai_client
+        if openai_client is None:
+            try:
+                # Try to initialize the client
+                openai_client = OpenAI(api_key=OPENAI_API_KEY)
+                return openai_client
+            except TypeError as e:
+                if "proxies" in str(e):
+                    print(f"OpenAI client initialization failed - version conflict: {str(e)}")
+                    # Try alternative initialization without problematic parameters
+                    try:
+                        import os
+                        os.environ["OPENAI_API_KEY"] = OPENAI_API_KEY
+                        openai_client = OpenAI()
+                        return openai_client
+                    except Exception as fallback_error:
+                        print(f"OpenAI fallback initialization also failed: {str(fallback_error)}")
+                        return None
+                else:
+                    print(f"OpenAI client initialization failed: {str(e)}")
+                    return None
+            except Exception as e:
+                print(f"OpenAI client initialization failed: {str(e)}")
+                return None
+        return openai_client
     
 except ImportError:
     OPENAI_AVAILABLE = False
     openai_client = None
+    def get_openai_client():
+        return None
     print("OpenAI not available - install with: pip install openai")
+except Exception as e:
+    OPENAI_AVAILABLE = False
+    openai_client = None
+    def get_openai_client():
+        return None
+    print(f"OpenAI initialization error: {str(e)}")
 
 # Free document processing libraries - with graceful fallback
 try:
@@ -437,7 +474,12 @@ Provide a JSON response with:
 
 Keep response concise to minimize costs."""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_enhanced": False}
+            
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -491,7 +533,12 @@ Return JSON with:
 
 Be concise to minimize costs."""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_enhanced": False}
+
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=500,  # Small response for cost control
@@ -540,7 +587,12 @@ Provide a JSON response with:
 
 Common mortgage document types: Mortgage, Promissory Note, Closing Instructions, Anti Coercion Statement, Power of Attorney, Acknowledgment, Flood Hazard, Automatic Payments, Tax Records"""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_analysis": False}
+
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -581,7 +633,12 @@ Provide a JSON response with:
 4. compliance_score: Overall compliance percentage (0-100)
 5. recommendations: Specific suggestions for improvement"""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_analysis": False}
+
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -627,7 +684,12 @@ Provide a JSON response with:
 3. confidence_score: Confidence in the ordering (0-100)
 4. alternative_orders: Other viable ordering options"""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_analysis": False}
+
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
@@ -669,7 +731,12 @@ Provide a JSON response with:
 5. recommendations: Suggestions for improvement
 6. risk_assessment: Low/Medium/High risk level"""
 
-            response = openai_client.chat.completions.create(
+            # Get OpenAI client with error handling
+            client = get_openai_client()
+            if not client:
+                return {"error": "OpenAI client not available", "ai_analysis": False}
+
+            response = client.chat.completions.create(
                 model=MODEL_NAME,
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=MAX_TOKENS_PER_REQUEST,
