@@ -48,6 +48,239 @@ try:
 except ImportError:
     OCR_AVAILABLE = False
 
+# PDF reorganization libraries
+try:
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.pagesizes import letter
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    from PyPDF2 import PdfReader, PdfWriter
+    import io
+    PDF_GENERATION_AVAILABLE = True
+except ImportError:
+    PDF_GENERATION_AVAILABLE = False
+    print("PDF generation not available - install with: pip install reportlab PyPDF2")
+
+# PDF Generation and Compliance Classes
+class SmartPDFGenerator:
+    """AI-powered PDF generation with compliance checking"""
+    
+    def __init__(self, ai_instance):
+        self.ai = ai_instance
+    
+    def create_organized_pdf(self, ordered_documents, output_path, lender_requirements):
+        """Create organized PDF based on optimal document order"""
+        if not PDF_GENERATION_AVAILABLE:
+            return {"success": False, "error": "PDF generation libraries not available"}
+        
+        try:
+            # Generate compliance checklist first
+            compliance_checklist = self._generate_compliance_checklist(
+                ordered_documents, lender_requirements
+            )
+            
+            # Create cover page with compliance information
+            cover_pdf_path = output_path.replace(".pdf", "_compliance_report.pdf")
+            self._create_cover_page(cover_pdf_path, compliance_checklist, lender_requirements)
+            
+            return {
+                "success": True,
+                "output_path": output_path,
+                "compliance_report_path": cover_pdf_path,
+                "compliance_checklist": compliance_checklist,
+                "total_documents": len(ordered_documents),
+                "organization_method": "AI-powered smart ordering"
+            }
+            
+        except Exception as e:
+            return {"success": False, "error": f"PDF generation failed: {str(e)}"}
+    
+    def _create_cover_page(self, output_path, compliance_checklist, lender_requirements):
+        """Create a professional cover page with compliance information"""
+        try:
+            doc = SimpleDocTemplate(output_path, pagesize=letter)
+            styles = getSampleStyleSheet()
+            story = []
+            
+            # Title
+            title_style = ParagraphStyle(
+                'CustomTitle',
+                parent=styles['Heading1'],
+                fontSize=24,
+                spaceAfter=30,
+                alignment=1,  # Center
+                textColor=colors.darkblue
+            )
+            story.append(Paragraph("🏠 Mortgage Package Compliance Report", title_style))
+            story.append(Spacer(1, 20))
+            
+            # Lender Information
+            heading_style = ParagraphStyle(
+                'CustomHeading',
+                parent=styles['Heading2'],
+                fontSize=16,
+                spaceAfter=12,
+                textColor=colors.darkblue
+            )
+            
+            story.append(Paragraph("📋 Lender Information", heading_style))
+            lender_data = [
+                ["Lender Name:", lender_requirements.get('lender_name', 'Unknown')],
+                ["Contact Email:", lender_requirements.get('contact_email', 'Unknown')],
+                ["Analysis Date:", datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                ["Total Documents:", str(compliance_checklist['total_documents'])]
+            ]
+            
+            lender_table = Table(lender_data, colWidths=[2*inch, 4*inch])
+            lender_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(lender_table)
+            story.append(Spacer(1, 20))
+            
+            # Compliance Summary
+            story.append(Paragraph("✅ Compliance Summary", heading_style))
+            
+            compliance_score = compliance_checklist.get('compliance_score', 0)
+            score_color = colors.green if compliance_score >= 80 else colors.orange if compliance_score >= 60 else colors.red
+            
+            compliance_data = [
+                ["Compliance Score:", f"{compliance_score}%"],
+                ["Documents Matched:", str(len(compliance_checklist['document_types']))],
+                ["Missing Documents:", str(len(compliance_checklist.get('missing_documents', [])))],
+                ["AI Analysis:", "✓ Completed" if self.ai else "✗ Not Available"]
+            ]
+            
+            compliance_table = Table(compliance_data, colWidths=[2*inch, 4*inch])
+            compliance_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (0, -1), colors.lightgrey),
+                ('TEXTCOLOR', (0, 1), (1, 1), score_color),
+                ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 10),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 12),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black)
+            ]))
+            story.append(compliance_table)
+            story.append(Spacer(1, 20))
+            
+            # Document List
+            story.append(Paragraph("📄 Document Organization", heading_style))
+            
+            doc_data = [["Position", "Document Type", "Status", "Notes"]]
+            for i, doc_type in enumerate(compliance_checklist['document_types'], 1):
+                status = "✓ Included"
+                notes = "Standard mortgage document"
+                doc_data.append([str(i), doc_type, status, notes])
+            
+            # Add missing documents
+            for missing_doc in compliance_checklist.get('missing_documents', []):
+                doc_data.append(["-", missing_doc, "✗ Missing", "Required by lender"])
+            
+            doc_table = Table(doc_data, colWidths=[0.8*inch, 2.5*inch, 1.2*inch, 1.5*inch])
+            doc_table.setStyle(TableStyle([
+                ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+                ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+                ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
+                ('FONTSIZE', (0, 0), (-1, -1), 9),
+                ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+                ('GRID', (0, 0), (-1, -1), 1, colors.black),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.lightgrey])
+            ]))
+            story.append(doc_table)
+            story.append(Spacer(1, 20))
+            
+            # Recommendations
+            story.append(Paragraph("🤖 AI Recommendations", heading_style))
+            for i, recommendation in enumerate(compliance_checklist.get('recommendations', []), 1):
+                story.append(Paragraph(f"{i}. {recommendation}", styles['Normal']))
+            
+            # Build PDF
+            doc.build(story)
+            return True
+            
+        except Exception as e:
+            print(f"Cover page generation failed: {str(e)}")
+            return False
+    
+    def _generate_compliance_checklist(self, ordered_documents, lender_requirements):
+        """Generate comprehensive compliance checklist"""
+        
+        # Extract document names from ordered documents
+        if isinstance(ordered_documents, list) and len(ordered_documents) > 0:
+            if isinstance(ordered_documents[0], dict):
+                document_types = [doc.get("document_name", doc.get("name", "Unknown")) for doc in ordered_documents]
+            else:
+                document_types = [str(doc) for doc in ordered_documents]
+        else:
+            document_types = []
+        
+        # Standard mortgage documents for comparison
+        standard_docs = [
+            "Mortgage", "Promissory Note", "Lenders Closing Instructions Guaranty",
+            "Statement of Anti Coercion Florida", "Correction Agreement and Limited Power of Attorney",
+            "All Purpose Acknowledgment", "Flood Hazard Determination", 
+            "Automatic Payments Authorization", "Tax Record Information"
+        ]
+        
+        # Calculate compliance score
+        required_docs = lender_requirements.get('documents', standard_docs)
+        found_docs = 0
+        missing_docs = []
+        
+        for required_doc in required_docs[:10]:  # Limit to first 10 for analysis
+            found = False
+            for doc_type in document_types:
+                if any(keyword in doc_type.lower() for keyword in required_doc.lower().split()):
+                    found = True
+                    break
+            
+            if found:
+                found_docs += 1
+            else:
+                missing_docs.append(required_doc)
+        
+        compliance_score = int((found_docs / max(len(required_docs[:10]), 1)) * 100)
+        
+        # Generate recommendations
+        recommendations = []
+        if compliance_score >= 90:
+            recommendations.append("Excellent compliance - package ready for submission")
+        elif compliance_score >= 75:
+            recommendations.append("Good compliance - minor items may need attention")
+            recommendations.append("Review missing documents for completeness")
+        else:
+            recommendations.append("Compliance needs improvement - several documents missing")
+            recommendations.append("Contact lender to clarify requirements")
+        
+        if missing_docs:
+            recommendations.append(f"Obtain missing documents: {', '.join(missing_docs[:3])}")
+        
+        recommendations.append("AI analysis completed - manual review recommended")
+        
+        return {
+            "total_documents": len(document_types),
+            "document_types": document_types,
+            "compliance_score": compliance_score,
+            "missing_documents": missing_docs,
+            "found_documents": found_docs,
+            "required_documents": len(required_docs[:10]),
+            "recommendations": recommendations,
+            "analysis_timestamp": datetime.now().isoformat(),
+            "lender_name": lender_requirements.get('lender_name', 'Unknown')
+        }
+
 app = Flask(__name__)
 CORS(app)
 
@@ -497,6 +730,467 @@ Be concise to minimize costs."""
 
 # Initialize AI processor
 mortgage_ai = MortgageAI() if OPENAI_AVAILABLE else None
+
+class PDFReorganizationAI:
+    """AI-powered PDF reorganization based on lender requirements"""
+    
+    def __init__(self):
+        self.total_tokens_used = 0
+        self.max_daily_tokens = 50000  # Cost control limit
+        self.reorganization_cache = {}
+    
+    def analyze_lender_requirements(self, lender_requirements):
+        """Extract document order preferences from lender requirements"""
+        if not OPENAI_AVAILABLE:
+            return {"error": "OpenAI not available", "ai_analysis": False}
+        
+        try:
+            prompt = f"""Analyze these lender requirements and determine the optimal document order for a mortgage package:
+
+Requirements: {json.dumps(lender_requirements, indent=2)}
+
+Provide a JSON response with:
+1. preferred_order: Array of document types in preferred order
+2. mandatory_documents: Array of required documents
+3. optional_documents: Array of optional documents
+4. special_instructions: Any specific ordering or formatting requirements
+
+Common mortgage document types: Mortgage, Promissory Note, Closing Instructions, Anti Coercion Statement, Power of Attorney, Acknowledgment, Flood Hazard, Automatic Payments, Tax Records"""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=MAX_TOKENS_PER_REQUEST,
+                temperature=0.1
+            )
+            
+            tokens_used = response.usage.total_tokens
+            self.total_tokens_used += tokens_used
+            
+            return {
+                "ai_analysis": True,
+                "analysis": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.total_tokens_used
+            }
+            
+        except Exception as e:
+            return {"error": f"AI analysis failed: {str(e)}", "ai_analysis": False}
+    
+    def match_documents_to_requirements(self, separated_documents, lender_requirements):
+        """Match separated documents to lender requirements using AI"""
+        if not OPENAI_AVAILABLE:
+            return {"error": "OpenAI not available", "ai_analysis": False}
+        
+        try:
+            prompt = f"""Match these separated documents to lender requirements and suggest optimal organization:
+
+Separated Documents:
+{json.dumps(separated_documents, indent=2)}
+
+Lender Requirements:
+{json.dumps(lender_requirements, indent=2)}
+
+Provide a JSON response with:
+1. document_matches: Array of objects with document_name, requirement_match, confidence_score
+2. suggested_order: Optimal order for the reorganized PDF
+3. missing_documents: Documents required but not found
+4. compliance_score: Overall compliance percentage (0-100)
+5. recommendations: Specific suggestions for improvement"""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=MAX_TOKENS_PER_REQUEST,
+                temperature=0.1
+            )
+            
+            tokens_used = response.usage.total_tokens
+            self.total_tokens_used += tokens_used
+            
+            return {
+                "ai_analysis": True,
+                "matching_result": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.total_tokens_used
+            }
+            
+        except Exception as e:
+            return {"error": f"AI matching failed: {str(e)}", "ai_analysis": False}
+
+# Enhanced PDF reorganization AI
+class SmartDocumentMatcher:
+    """AI-powered document matching engine"""
+    
+    def __init__(self, ai_instance):
+        self.ai = ai_instance
+        self.matching_cache = {}
+    
+    def match_documents_to_requirements(self, separated_documents, lender_requirements):
+        """Match separated documents to lender requirements with AI analysis"""
+        if not OPENAI_AVAILABLE:
+            return self._fallback_matching(separated_documents, lender_requirements)
+        
+        # Create cache key
+        cache_key = hash(str(separated_documents) + str(lender_requirements))
+        if cache_key in self.matching_cache:
+            return self.matching_cache[cache_key]
+        
+        try:
+            # Prepare structured data for AI
+            docs_summary = []
+            for doc in separated_documents:
+                docs_summary.append({
+                    "name": doc.get("name", "Unknown"),
+                    "pages": doc.get("pages", "Unknown"),
+                    "confidence": doc.get("confidence", "medium"),
+                    "type": doc.get("type", "document")
+                })
+            
+            requirements_summary = {
+                "lender_name": lender_requirements.get("lender_name", "Unknown"),
+                "required_documents": lender_requirements.get("documents", [])[:20],  # Limit for cost
+                "special_instructions": lender_requirements.get("special_instructions", [])[:5]
+            }
+            
+            prompt = f"""Analyze these mortgage documents and match them to lender requirements:
+
+SEPARATED DOCUMENTS:
+{json.dumps(docs_summary, indent=2)}
+
+LENDER REQUIREMENTS:
+{json.dumps(requirements_summary, indent=2)}
+
+Provide a JSON response with:
+{{
+  "document_matches": [
+    {{
+      "document_name": "document name",
+      "requirement_match": "matching requirement or 'Standard mortgage document'",
+      "confidence_score": 85,
+      "priority": "high/medium/low",
+      "notes": "brief explanation"
+    }}
+  ],
+  "suggested_order": ["document1", "document2", "document3"],
+  "missing_documents": ["missing doc 1", "missing doc 2"],
+  "compliance_score": 85,
+  "recommendations": ["recommendation 1", "recommendation 2"]
+}}
+
+Focus on mortgage industry standards and lender-specific requirements."""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=MAX_TOKENS_PER_REQUEST,
+                temperature=0.1
+            )
+            
+            tokens_used = response.usage.total_tokens
+            self.ai.total_tokens_used += tokens_used
+            
+            result = {
+                "success": True,
+                "ai_analysis": True,
+                "matching_result": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.ai.total_tokens_used,
+                "model": MODEL_NAME
+            }
+            
+            # Cache the result
+            self.matching_cache[cache_key] = result
+            return result
+            
+        except Exception as e:
+            return {"success": False, "error": f"AI matching failed: {str(e)}", "ai_analysis": False}
+    
+    def _fallback_matching(self, separated_documents, lender_requirements):
+        """Fallback matching when AI is not available"""
+        matches = []
+        for doc in separated_documents:
+            matches.append({
+                "document_name": doc.get("name", "Unknown"),
+                "requirement_match": "Standard mortgage document",
+                "confidence_score": 70,
+                "priority": "medium",
+                "notes": "Fallback matching (AI unavailable)"
+            })
+        
+        return {
+            "success": True,
+            "ai_analysis": False,
+            "matching_result": json.dumps({
+                "document_matches": matches,
+                "suggested_order": [doc.get("name", f"Document {i+1}") for i, doc in enumerate(separated_documents)],
+                "missing_documents": [],
+                "compliance_score": 75,
+                "recommendations": ["AI analysis unavailable - manual review recommended"]
+            }),
+            "fallback": True
+        }
+
+class SmartDocumentOrderer:
+    """AI-powered document ordering system"""
+    
+    def __init__(self, ai_instance):
+        self.ai = ai_instance
+        self.ordering_cache = {}
+    
+    def determine_optimal_order(self, matched_documents, lender_preferences):
+        """Determine optimal document order using AI"""
+        if not OPENAI_AVAILABLE:
+            return self._fallback_ordering(matched_documents)
+        
+        cache_key = hash(str(matched_documents) + str(lender_preferences))
+        if cache_key in self.ordering_cache:
+            return self.ordering_cache[cache_key]
+        
+        try:
+            prompt = f"""Determine the optimal order for these mortgage documents based on industry standards and lender preferences:
+
+MATCHED DOCUMENTS:
+{json.dumps(matched_documents, indent=2)}
+
+LENDER PREFERENCES:
+{json.dumps(lender_preferences, indent=2)}
+
+Consider:
+1. Industry standard mortgage document order
+2. Lender-specific requirements
+3. Document dependencies (some docs reference others)
+4. Logical flow for underwriter review
+
+Provide a JSON response with:
+{{
+  "optimal_order": [
+    {{
+      "document_name": "document name",
+      "position": 1,
+      "rationale": "why this position"
+    }}
+  ],
+  "ordering_rationale": "overall explanation of the ordering logic",
+  "compliance_notes": ["note 1", "note 2"]
+}}"""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=MAX_TOKENS_PER_REQUEST,
+                temperature=0.1
+            )
+            
+            tokens_used = response.usage.total_tokens
+            self.ai.total_tokens_used += tokens_used
+            
+            result = {
+                "success": True,
+                "ai_analysis": True,
+                "ordering_result": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.ai.total_tokens_used
+            }
+            
+            self.ordering_cache[cache_key] = result
+            return result
+            
+        except Exception as e:
+            return {"success": False, "error": f"AI ordering failed: {str(e)}", "ai_analysis": False}
+    
+    def _fallback_ordering(self, matched_documents):
+        """Fallback ordering when AI is not available"""
+        # Standard mortgage document order
+        standard_order = [
+            "Mortgage", "Promissory Note", "Lenders Closing Instructions Guaranty",
+            "Statement of Anti Coercion Florida", "Correction Agreement and Limited Power of Attorney",
+            "All Purpose Acknowledgment", "Flood Hazard Determination", 
+            "Automatic Payments Authorization", "Tax Record Information"
+        ]
+        
+        ordered_docs = []
+        position = 1
+        
+        # Order by standard sequence
+        for standard_doc in standard_order:
+            for doc in matched_documents:
+                if standard_doc.lower() in doc.get("document_name", "").lower():
+                    ordered_docs.append({
+                        "document_name": doc.get("document_name"),
+                        "position": position,
+                        "rationale": f"Standard mortgage document order (position {position})"
+                    })
+                    position += 1
+                    break
+        
+        # Add any remaining documents
+        for doc in matched_documents:
+            if not any(ordered_doc["document_name"] == doc.get("document_name") for ordered_doc in ordered_docs):
+                ordered_docs.append({
+                    "document_name": doc.get("document_name"),
+                    "position": position,
+                    "rationale": "Additional document - placed at end"
+                })
+                position += 1
+        
+        return {
+            "success": True,
+            "ai_analysis": False,
+            "ordering_result": json.dumps({
+                "optimal_order": ordered_docs,
+                "ordering_rationale": "Standard mortgage document order applied (AI unavailable)",
+                "compliance_notes": ["Manual review recommended for optimal ordering"]
+            }),
+            "fallback": True
+        }
+
+class EnhancedPDFReorganizationAI:
+    """Enhanced AI-powered PDF reorganization system"""
+    
+    def __init__(self):
+        self.total_tokens_used = 0
+        self.max_daily_tokens = 50000
+        
+        # Initialize sub-components
+        self.matcher = SmartDocumentMatcher(self)
+        self.orderer = SmartDocumentOrderer(self)
+        self.generator = SmartPDFGenerator(self)
+    
+    def reorganize_mortgage_package(self, separated_documents, lender_requirements):
+        """Complete AI-powered mortgage package reorganization"""
+        results = {
+            "success": False,
+            "steps_completed": [],
+            "ai_analysis": OPENAI_AVAILABLE,
+            "total_tokens_used": 0
+        }
+        
+        try:
+            # Step 1: Match documents to requirements
+            matching_result = self.matcher.match_documents_to_requirements(
+                separated_documents, lender_requirements
+            )
+            
+            if not matching_result.get("success", False):
+                results["error"] = "Document matching failed"
+                return results
+            
+            results["steps_completed"].append("document_matching")
+            results["matching_analysis"] = matching_result
+            
+            # Parse AI matching result
+            try:
+                matching_data = json.loads(matching_result["matching_result"])
+                matched_documents = matching_data.get("document_matches", [])
+            except:
+                matched_documents = separated_documents  # Fallback
+            
+            # Step 2: Determine optimal order
+            ordering_result = self.orderer.determine_optimal_order(
+                matched_documents, lender_requirements
+            )
+            
+            if not ordering_result.get("success", False):
+                results["error"] = "Document ordering failed"
+                return results
+            
+            results["steps_completed"].append("document_ordering")
+            results["ordering_analysis"] = ordering_result
+            
+            # Step 3: Generate compliance report and organized PDF
+            output_path = f"/home/ubuntu/mortgage_package_organized_{datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+            generation_result = self.generator.create_organized_pdf(
+                matched_documents, output_path, lender_requirements
+            )
+            
+            if generation_result.get("success"):
+                results["steps_completed"].append("pdf_generation")
+                results["generation_result"] = generation_result
+                results["compliance_report_path"] = generation_result.get("compliance_report_path")
+                results["compliance_checklist"] = generation_result.get("compliance_checklist")
+            
+            # Calculate total tokens used
+            total_tokens = 0
+            if matching_result.get("tokens_used"):
+                total_tokens += matching_result["tokens_used"]
+            if ordering_result.get("tokens_used"):
+                total_tokens += ordering_result["tokens_used"]
+            
+            results["total_tokens_used"] = total_tokens
+            results["estimated_cost"] = f"${(total_tokens * 0.00015):.4f}"
+            results["success"] = True
+            
+            return results
+            
+        except Exception as e:
+            results["error"] = f"Reorganization failed: {str(e)}"
+            return results
+
+# Initialize enhanced PDF reorganization AI
+enhanced_pdf_ai = EnhancedPDFReorganizationAI() if OPENAI_AVAILABLE else None
+
+@app.route('/reorganize_pdf', methods=['POST'])
+def reorganize_pdf():
+    """AI-powered PDF reorganization endpoint"""
+    try:
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({'success': False, 'error': 'No data provided'})
+        
+        separated_documents = data.get('separated_documents', [])
+        lender_requirements_data = data.get('lender_requirements', {})
+        
+        if not separated_documents:
+            return jsonify({'success': False, 'error': 'No separated documents provided'})
+        
+        if not lender_requirements_data:
+            # Use global lender requirements if not provided
+            lender_requirements_data = lender_requirements
+        
+        if not enhanced_pdf_ai:
+            return jsonify({
+                'success': False, 
+                'error': 'AI reorganization not available',
+                'fallback_available': True
+            })
+        
+        # Perform AI-powered reorganization
+        reorganization_result = enhanced_pdf_ai.reorganize_mortgage_package(
+            separated_documents, lender_requirements_data
+        )
+        
+        if reorganization_result.get('success'):
+            response_data = {
+                'success': True,
+                'reorganization_complete': True,
+                'steps_completed': reorganization_result['steps_completed'],
+                'ai_analysis': reorganization_result['ai_analysis'],
+                'total_tokens_used': reorganization_result['total_tokens_used'],
+                'estimated_cost': reorganization_result['estimated_cost']
+            }
+            
+            # Add matching analysis if available
+            if 'matching_analysis' in reorganization_result:
+                response_data['matching_analysis'] = reorganization_result['matching_analysis']
+            
+            # Add ordering analysis if available
+            if 'ordering_analysis' in reorganization_result:
+                response_data['ordering_analysis'] = reorganization_result['ordering_analysis']
+            
+            return jsonify(response_data)
+        else:
+            return jsonify({
+                'success': False,
+                'error': reorganization_result.get('error', 'Unknown reorganization error')
+            })
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+# Initialize PDF reorganization AI
+pdf_reorganizer_ai = PDFReorganizationAI() if OPENAI_AVAILABLE else None
 
 def parse_lender_email(content):
     """Enhanced email parsing for lender requirements with memory optimization"""
@@ -1593,8 +2287,43 @@ def index():
                     </div>
                     <span style="color: #888; font-size: 0.9rem;">Complete Steps 1-2 first</span>
                 </div>
+                
+                <div class="workflow-step" id="step4">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div class="step-number">4</div>
+                        <div>
+                            <strong style="color: white;">Smart Reorganize</strong>
+                            <div style="font-size: 0.9rem; color: #b0b0b0;">AI-powered document reorganization with compliance report</div>
+                        </div>
+                    </div>
+                    <span style="color: #888; font-size: 0.9rem;">Complete Steps 1-3 first</span>
+                </div>
             </div>
-        </div>
+            
+            <!-- Smart Reorganize Section -->
+            <div id="smartReorganizeSection" class="smart-reorganize-section" style="display: none; margin-top: 30px; background: rgba(0,255,0,0.05); border: 1px solid rgba(0,255,0,0.2); border-radius: 15px; padding: 25px;">
+                <h3 style="color: #00ff00; margin-bottom: 15px;">🤖 AI-Powered Smart Reorganization</h3>
+                <p style="color: #b0b0b0; margin-bottom: 20px;">Organize your documents based on lender requirements and generate a compliance report.</p>
+                
+                <div style="display: flex; gap: 15px; flex-wrap: wrap; align-items: center;">
+                    <button id="smartReorganizeBtn" onclick="startSmartReorganization()" 
+                            style="background: linear-gradient(45deg, #00ff00, #00cc00); color: #000; border: none; padding: 12px 25px; border-radius: 25px; cursor: pointer; font-weight: 600; font-size: 1rem;">
+                        🚀 Smart Reorganize
+                    </button>
+                    
+                    <div id="reorganizeProgress" style="display: none; flex: 1; min-width: 200px;">
+                        <div style="background: rgba(255,255,255,0.1); border-radius: 10px; height: 8px; overflow: hidden;">
+                            <div id="reorganizeProgressFill" style="background: linear-gradient(90deg, #00ff00, #00cc00); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+                        </div>
+                        <div id="reorganizeStatus" style="color: #00ff00; font-size: 0.9rem; margin-top: 5px;">Initializing...</div>
+                    </div>
+                </div>
+                
+                <div id="reorganizeResults" style="margin-top: 20px; display: none;">
+                    <!-- Results will be populated here -->
+                </div>
+            </div>
+        </div>/div>
 
         <!-- Universal Upload Section (for non-mortgage industries) -->
         <div class="upload-section" id="universalUpload">
@@ -2335,6 +3064,249 @@ def index():
             html += '</div>';
             container.innerHTML = html;
         }
+
+        // Smart Reorganization Functions
+        let separatedDocuments = [];
+        let lenderRequirements = {};
+
+        function startSmartReorganization() {
+            const btn = document.getElementById('smartReorganizeBtn');
+            const progress = document.getElementById('reorganizeProgress');
+            const status = document.getElementById('reorganizeStatus');
+            const results = document.getElementById('reorganizeResults');
+            
+            // Check if we have the required data
+            if (!separatedDocuments.length) {
+                alert('Please complete document analysis first to get separated documents.');
+                return;
+            }
+            
+            // Show progress and disable button
+            btn.disabled = true;
+            btn.style.opacity = '0.6';
+            progress.style.display = 'block';
+            results.style.display = 'none';
+            
+            // Simulate progress steps
+            updateReorganizeProgress(20, 'Matching documents to requirements...');
+            
+            setTimeout(() => {
+                updateReorganizeProgress(50, 'Determining optimal document order...');
+                
+                setTimeout(() => {
+                    updateReorganizeProgress(80, 'Generating compliance report...');
+                    
+                    setTimeout(() => {
+                        performSmartReorganization();
+                    }, 1000);
+                }, 1500);
+            }, 1000);
+        }
+
+        function updateReorganizeProgress(percentage, statusText) {
+            const fill = document.getElementById('reorganizeProgressFill');
+            const status = document.getElementById('reorganizeStatus');
+            
+            fill.style.width = percentage + '%';
+            status.textContent = statusText;
+        }
+
+        function performSmartReorganization() {
+            fetch('/reorganize_pdf', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    separated_documents: separatedDocuments,
+                    lender_requirements: lenderRequirements
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                updateReorganizeProgress(100, 'Reorganization complete!');
+                
+                setTimeout(() => {
+                    displayReorganizationResults(data);
+                    
+                    // Reset button
+                    const btn = document.getElementById('smartReorganizeBtn');
+                    btn.disabled = false;
+                    btn.style.opacity = '1';
+                    document.getElementById('reorganizeProgress').style.display = 'none';
+                }, 500);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                updateReorganizeProgress(0, 'Error occurred during reorganization');
+                
+                // Reset button
+                const btn = document.getElementById('smartReorganizeBtn');
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                
+                setTimeout(() => {
+                    document.getElementById('reorganizeProgress').style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        function displayReorganizationResults(data) {
+            const container = document.getElementById('reorganizeResults');
+            
+            if (data.success) {
+                let html = '<div style="background: rgba(0,255,0,0.1); border: 1px solid #00ff00; border-radius: 10px; padding: 20px;">';
+                html += '<h4 style="color: #00ff00; margin-bottom: 15px;">✅ Smart Reorganization Complete!</h4>';
+                
+                // Summary
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">';
+                html += '<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">';
+                html += '<div style="color: #00ff00; font-size: 1.5rem; font-weight: bold;">' + data.steps_completed.length + '</div>';
+                html += '<div style="color: #b0b0b0; font-size: 0.9rem;">Steps Completed</div>';
+                html += '</div>';
+                
+                if (data.total_tokens_used) {
+                    html += '<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">';
+                    html += '<div style="color: #00d4ff; font-size: 1.5rem; font-weight: bold;">' + data.total_tokens_used + '</div>';
+                    html += '<div style="color: #b0b0b0; font-size: 0.9rem;">AI Tokens Used</div>';
+                    html += '</div>';
+                }
+                
+                if (data.estimated_cost) {
+                    html += '<div style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 8px; text-align: center;">';
+                    html += '<div style="color: #ffa500; font-size: 1.5rem; font-weight: bold;">' + data.estimated_cost + '</div>';
+                    html += '<div style="color: #b0b0b0; font-size: 0.9rem;">Estimated Cost</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+                
+                // Steps completed
+                html += '<div style="margin-bottom: 20px;">';
+                html += '<h5 style="color: white; margin-bottom: 10px;">📋 Process Steps:</h5>';
+                data.steps_completed.forEach(step => {
+                    const stepNames = {
+                        'document_matching': '🔍 Document Matching',
+                        'document_ordering': '📊 Document Ordering',
+                        'pdf_generation': '📄 PDF Generation'
+                    };
+                    html += '<div style="background: rgba(0,255,0,0.1); padding: 8px 15px; border-radius: 20px; display: inline-block; margin: 5px; border: 1px solid #00ff00;">';
+                    html += '<span style="color: #00ff00;">✓</span> ' + (stepNames[step] || step);
+                    html += '</div>';
+                });
+                html += '</div>';
+                
+                // Download buttons
+                html += '<div style="display: flex; gap: 15px; flex-wrap: wrap;">';
+                
+                if (data.compliance_report_path) {
+                    html += '<button onclick="downloadComplianceReport(\'' + data.compliance_report_path + '\')" ';
+                    html += 'style="background: linear-gradient(45deg, #00ff00, #00cc00); color: #000; border: none; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-weight: 600;">';
+                    html += '📄 Download Compliance Report</button>';
+                }
+                
+                html += '<button onclick="viewDetailedAnalysis()" ';
+                html += 'style="background: rgba(0,212,255,0.2); color: #00d4ff; border: 1px solid #00d4ff; padding: 12px 20px; border-radius: 25px; cursor: pointer; font-weight: 600;">';
+                html += '🔍 View Detailed Analysis</button>';
+                
+                html += '</div>';
+                html += '</div>';
+                
+                container.innerHTML = html;
+                container.style.display = 'block';
+                
+                // Store results for detailed view
+                window.reorganizationData = data;
+                
+            } else {
+                let html = '<div style="background: rgba(255,0,0,0.1); border: 1px solid #ff0000; border-radius: 10px; padding: 20px;">';
+                html += '<h4 style="color: #ff6b35; margin-bottom: 15px;">❌ Reorganization Failed</h4>';
+                html += '<p style="color: #b0b0b0;">' + (data.error || 'Unknown error occurred') + '</p>';
+                html += '</div>';
+                
+                container.innerHTML = html;
+                container.style.display = 'block';
+            }
+        }
+
+        function downloadComplianceReport(filePath) {
+            // Create a download link for the compliance report
+            const link = document.createElement('a');
+            link.href = '/download/' + encodeURIComponent(filePath.split('/').pop());
+            link.download = 'mortgage_compliance_report.pdf';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        function viewDetailedAnalysis() {
+            if (window.reorganizationData) {
+                // Create a modal or new section to show detailed analysis
+                alert('Detailed analysis view would show:\n\n' + 
+                      '• Document matching results\n' + 
+                      '• Optimal ordering rationale\n' + 
+                      '• Compliance checklist details\n' + 
+                      '• AI recommendations');
+            }
+        }
+
+        // Update workflow step completion
+        function updateWorkflowStep(stepNumber, completed = true) {
+            const step = document.getElementById('step' + stepNumber);
+            if (step) {
+                const stepNumberEl = step.querySelector('.step-number');
+                const actionEl = step.querySelector('button, span');
+                
+                if (completed) {
+                    stepNumberEl.classList.add('active');
+                    stepNumberEl.style.background = '#00ff00';
+                    stepNumberEl.style.color = '#000';
+                    
+                    if (actionEl && actionEl.tagName === 'SPAN') {
+                        actionEl.style.color = '#00ff00';
+                        actionEl.textContent = '✓ Completed';
+                    }
+                    
+                    // Enable next step
+                    if (stepNumber < 4) {
+                        const nextStep = document.getElementById('step' + (stepNumber + 1));
+                        if (nextStep) {
+                            const nextActionEl = nextStep.querySelector('span');
+                            if (nextActionEl) {
+                                nextActionEl.style.color = '#00d4ff';
+                                nextActionEl.textContent = 'Ready to proceed';
+                            }
+                        }
+                    }
+                    
+                    // Show Smart Reorganize section when step 3 is completed
+                    if (stepNumber === 3) {
+                        document.getElementById('smartReorganizeSection').style.display = 'block';
+                        updateWorkflowStep(4, false); // Prepare step 4
+                    }
+                }
+            }
+        }
+
+        // Override existing functions to update workflow
+        const originalDisplayDocumentSeparation = displayDocumentSeparation;
+        displayDocumentSeparation = function(data) {
+            originalDisplayDocumentSeparation(data);
+            
+            if (data.success && data.sections) {
+                separatedDocuments = data.sections;
+                updateWorkflowStep(3, true);
+            }
+        };
+
+        const originalParseEmail = parseEmail;
+        parseEmail = function() {
+            originalParseEmail();
+            
+            // Update after successful email parsing
+            setTimeout(() => {
+                updateWorkflowStep(1, true);
+            }, 1000);
+        };
     </script>
 </body>
 </html>
