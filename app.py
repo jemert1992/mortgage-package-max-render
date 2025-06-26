@@ -20,7 +20,7 @@ try:
     OPENAI_AVAILABLE = True
     
     # CACHE BUSTER - Force fresh deployment
-    DEPLOYMENT_TIMESTAMP = "2025-06-26-11-20-DYNAMIC-API-KEY-FIX"
+    DEPLOYMENT_TIMESTAMP = "2025-06-26-13-15-OS-SCOPING-FIX"
     
     # UPDATED API KEY - Force new key recognition
     NEW_OPENAI_API_KEY = "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"
@@ -91,7 +91,6 @@ try:
             # Try alternative initialization methods
             try:
                 # Method 2: Environment variable approach
-                import os
                 os.environ["OPENAI_API_KEY"] = current_api_key
                 openai_client = OpenAI()
                 
