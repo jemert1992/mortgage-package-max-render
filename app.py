@@ -5,6 +5,23 @@ import re
 import json
 from datetime import datetime
 
+# OpenAI integration with cost optimization
+try:
+    import openai
+    OPENAI_AVAILABLE = True
+    # Cost-optimized settings
+    OPENAI_API_KEY = "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"
+    openai.api_key = OPENAI_API_KEY
+    
+    # Cost control settings
+    MAX_TOKENS_PER_REQUEST = 1000  # Keep costs low
+    MODEL_NAME = "gpt-4o-mini"  # Much cheaper than gpt-4o
+    MAX_INPUT_TOKENS = 8000  # Limit input size
+    
+except ImportError:
+    OPENAI_AVAILABLE = False
+    print("OpenAI not available - install with: pip install openai")
+
 # Free document processing libraries - with graceful fallback
 try:
     import pdfplumber
@@ -340,6 +357,146 @@ class UniversalDocumentProcessor:
 
 # Initialize the universal processor
 document_processor = UniversalDocumentProcessor()
+
+# AI-Powered Analysis Functions with Cost Optimization
+class MortgageAI:
+    """AI-powered mortgage document analysis with cost controls"""
+    
+    def __init__(self):
+        self.total_tokens_used = 0
+        self.max_daily_tokens = 50000  # Cost control limit
+        self.analysis_cache = {}  # Cache results to avoid re-analysis
+    
+    def check_token_limit(self, estimated_tokens):
+        """Check if we're within token limits"""
+        if self.total_tokens_used + estimated_tokens > self.max_daily_tokens:
+            return False, f"Daily token limit reached ({self.max_daily_tokens})"
+        return True, "OK"
+    
+    def estimate_tokens(self, text):
+        """Estimate token count (rough approximation: 1 token ≈ 4 characters)"""
+        return len(text) // 4
+    
+    def truncate_text(self, text, max_tokens=MAX_INPUT_TOKENS):
+        """Truncate text to stay within token limits"""
+        estimated_tokens = self.estimate_tokens(text)
+        if estimated_tokens <= max_tokens:
+            return text
+        
+        # Truncate to approximately max_tokens
+        max_chars = max_tokens * 4
+        return text[:max_chars] + "... [truncated for cost optimization]"
+    
+    def analyze_mortgage_document(self, text, document_type="unknown"):
+        """AI-powered mortgage document analysis"""
+        if not OPENAI_AVAILABLE:
+            return {"error": "OpenAI not available", "ai_analysis": False}
+        
+        # Check cache first
+        text_hash = hash(text[:1000])  # Use first 1000 chars for cache key
+        if text_hash in self.analysis_cache:
+            return self.analysis_cache[text_hash]
+        
+        # Truncate text for cost control
+        text = self.truncate_text(text)
+        estimated_tokens = self.estimate_tokens(text)
+        
+        # Check token limits
+        can_proceed, message = self.check_token_limit(estimated_tokens + MAX_TOKENS_PER_REQUEST)
+        if not can_proceed:
+            return {"error": message, "ai_analysis": False}
+        
+        try:
+            # Cost-optimized prompt for mortgage analysis
+            prompt = f"""Analyze this mortgage document efficiently. Extract key information:
+
+Document Type: {document_type}
+Text: {text}
+
+Provide a JSON response with:
+1. document_category (Mortgage, Promissory Note, Closing Instructions, etc.)
+2. key_details (borrower, lender, amount, property, etc.)
+3. compliance_flags (any issues or missing info)
+4. confidence_score (0-100)
+
+Keep response concise to minimize costs."""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=MAX_TOKENS_PER_REQUEST,
+                temperature=0.1  # Low temperature for consistent results
+            )
+            
+            # Track token usage
+            tokens_used = response.usage.total_tokens
+            self.total_tokens_used += tokens_used
+            
+            result = {
+                "ai_analysis": True,
+                "analysis": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.total_tokens_used,
+                "model": MODEL_NAME
+            }
+            
+            # Cache the result
+            self.analysis_cache[text_hash] = result
+            
+            return result
+            
+        except Exception as e:
+            return {"error": f"AI analysis failed: {str(e)}", "ai_analysis": False}
+    
+    def enhance_lender_parsing(self, email_content):
+        """AI-enhanced lender email parsing"""
+        if not OPENAI_AVAILABLE:
+            return {"error": "OpenAI not available", "ai_enhanced": False}
+        
+        # Truncate for cost control
+        email_content = self.truncate_text(email_content, 4000)  # Smaller limit for emails
+        estimated_tokens = self.estimate_tokens(email_content)
+        
+        can_proceed, message = self.check_token_limit(estimated_tokens + 500)  # Smaller response
+        if not can_proceed:
+            return {"error": message, "ai_enhanced": False}
+        
+        try:
+            prompt = f"""Extract lender requirements from this email efficiently:
+
+{email_content}
+
+Return JSON with:
+1. lender_name
+2. required_documents (list)
+3. special_instructions
+4. deadline
+5. contact_info
+
+Be concise to minimize costs."""
+
+            response = openai.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=500,  # Small response for cost control
+                temperature=0.1
+            )
+            
+            tokens_used = response.usage.total_tokens
+            self.total_tokens_used += tokens_used
+            
+            return {
+                "ai_enhanced": True,
+                "enhanced_parsing": response.choices[0].message.content,
+                "tokens_used": tokens_used,
+                "total_tokens": self.total_tokens_used
+            }
+            
+        except Exception as e:
+            return {"error": f"AI enhancement failed: {str(e)}", "ai_enhanced": False}
+
+# Initialize AI processor
+mortgage_ai = MortgageAI() if OPENAI_AVAILABLE else None
 
 def parse_lender_email(content):
     """Enhanced email parsing for lender requirements with memory optimization"""
@@ -1956,6 +2113,15 @@ def index():
             if (data.success) {
                 let html = '<div style="background: rgba(0,255,0,0.1); border: 1px solid #00ff00; border-radius: 10px; padding: 20px;">';
                 html += '<h4 style="color: #00ff00; margin-bottom: 15px;">✅ Email Parsed Successfully</h4>';
+                
+                // AI Enhancement indicator (if available)
+                if (data.ai_enhanced) {
+                    html += '<div style="background: rgba(0,255,0,0.05); border-left: 4px solid #00ff00; padding: 10px; margin-bottom: 15px;">';
+                    html += '<h6 style="color: #00ff00; margin-bottom: 8px;">🤖 AI-Enhanced Parsing</h6>';
+                    html += `<p style="color: #b0b0b0; font-size: 0.9rem;">Tokens Used: ${data.ai_tokens_used || 0} | Cost: ${data.ai_cost_estimate || '$0.0000'}</p>`;
+                    html += '</div>';
+                }
+                
                 html += `<p><strong>Lender:</strong> ${data.lender_name}</p>`;
                 html += `<p><strong>Contact:</strong> ${data.contact_email}</p>`;
                 if (data.funding_amount) {
@@ -1969,7 +2135,17 @@ def index():
                 if (data.documents.length > 10) {
                     html += `<li style="color: #888;">... and ${data.documents.length - 10} more</li>`;
                 }
-                html += '</ul></div></div>';
+                html += '</ul></div>';
+                
+                // AI Insights (if available)
+                if (data.ai_insights) {
+                    html += '<div style="background: rgba(0,255,0,0.05); border-left: 4px solid #00ff00; padding: 10px; margin-top: 15px;">';
+                    html += '<h6 style="color: #00ff00; margin-bottom: 8px;">🤖 AI Enhanced Insights</h6>';
+                    html += `<div style="color: #b0b0b0; font-size: 0.9rem; white-space: pre-wrap;">${data.ai_insights}</div>`;
+                    html += '</div>';
+                }
+                
+                html += '</div>';
                 container.innerHTML = html;
             } else {
                 container.innerHTML = '<div style="background: rgba(255,0,0,0.1); border: 1px solid #ff0000; border-radius: 10px; padding: 20px; color: #ff6b35;"><h4>❌ Parsing Failed</h4><p>' + data.error + '</p></div>';
@@ -1982,6 +2158,16 @@ def index():
                 let html = '<div style="background: rgba(0,212,255,0.1); border: 1px solid #00d4ff; border-radius: 10px; padding: 20px; margin-bottom: 20px;">';
                 html += '<h4 style="color: #00d4ff; margin-bottom: 15px;">📊 Analysis Complete</h4>';
                 
+                // AI Enhancement Summary (if available)
+                if (data.ai_enhanced) {
+                    html += '<div style="background: rgba(0,255,0,0.1); border: 1px solid #00ff00; border-radius: 8px; padding: 15px; margin-bottom: 20px;">';
+                    html += '<h5 style="color: #00ff00; margin-bottom: 10px;">🤖 AI-Enhanced Analysis</h5>';
+                    html += `<p style="color: #b0b0b0;">AI Model: ${data.ai_insights[0]?.tokens ? 'GPT-4o-mini' : 'N/A'}</p>`;
+                    html += `<p style="color: #b0b0b0;">Total Tokens Used: ${data.total_ai_tokens || 0}</p>`;
+                    html += `<p style="color: #b0b0b0;">Estimated Cost: ${data.ai_cost_estimate || '$0.0000'}</p>`;
+                    html += '</div>';
+                }
+                
                 data.results.forEach((result, index) => {
                     html += '<div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 15px; margin-bottom: 15px;">';
                     html += `<h5 style="color: white; margin-bottom: 10px;">📄 ${result.filename}</h5>`;
@@ -1992,6 +2178,23 @@ def index():
                     if (result.categories && result.categories.length > 0) {
                         html += `<p><strong>Categories:</strong> ${result.categories.join(', ')}</p>`;
                     }
+                    
+                    // AI Insights for this document (if available)
+                    if (result.ai_insights) {
+                        html += '<div style="background: rgba(0,255,0,0.05); border-left: 4px solid #00ff00; padding: 10px; margin-top: 10px;">';
+                        html += '<h6 style="color: #00ff00; margin-bottom: 8px;">🤖 AI Insights</h6>';
+                        html += `<div style="color: #b0b0b0; font-size: 0.9rem; white-space: pre-wrap;">${result.ai_insights}</div>`;
+                        if (result.ai_tokens_used) {
+                            html += `<p style="color: #888; font-size: 0.8rem; margin-top: 8px;">Tokens: ${result.ai_tokens_used} | Model: ${result.ai_model}</p>`;
+                        }
+                        html += '</div>';
+                    } else if (result.ai_error) {
+                        html += '<div style="background: rgba(255,165,0,0.05); border-left: 4px solid #ffa500; padding: 10px; margin-top: 10px;">';
+                        html += '<h6 style="color: #ffa500; margin-bottom: 8px;">⚠️ AI Analysis</h6>';
+                        html += `<div style="color: #b0b0b0; font-size: 0.9rem;">${result.ai_error}</div>`;
+                        html += '</div>';
+                    }
+                    
                     html += '</div>';
                 });
                 
@@ -2139,7 +2342,7 @@ def index():
 
 @app.route('/analyze', methods=['POST'])
 def analyze_documents():
-    """Analyze uploaded documents"""
+    """Analyze uploaded documents with AI enhancement"""
     try:
         if 'files' not in request.files:
             return jsonify({'success': False, 'error': 'No files uploaded'})
@@ -2152,6 +2355,8 @@ def analyze_documents():
         
         results = []
         sections = []
+        ai_insights = []
+        total_tokens_used = 0
         
         for file in files:
             if file.filename == '':
@@ -2166,12 +2371,33 @@ def analyze_documents():
                 processing_result = document_processor.process_file(temp_path, file.filename)
                 
                 if processing_result['success']:
-                    # Analyze the content
+                    # Standard analysis
                     analysis_result = analyze_document_content(
                         processing_result['text'], 
                         file.filename, 
                         industry
                     )
+                    
+                    # AI-Enhanced Analysis (if available and for mortgage industry)
+                    if mortgage_ai and industry == 'mortgage' and processing_result['text']:
+                        ai_result = mortgage_ai.analyze_mortgage_document(
+                            processing_result['text'], 
+                            file.filename
+                        )
+                        
+                        if ai_result.get('ai_analysis'):
+                            analysis_result['ai_insights'] = ai_result['analysis']
+                            analysis_result['ai_tokens_used'] = ai_result['tokens_used']
+                            analysis_result['ai_model'] = ai_result['model']
+                            total_tokens_used += ai_result['tokens_used']
+                            ai_insights.append({
+                                'filename': file.filename,
+                                'analysis': ai_result['analysis'],
+                                'tokens': ai_result['tokens_used']
+                            })
+                        else:
+                            analysis_result['ai_error'] = ai_result.get('error', 'AI analysis unavailable')
+                    
                     results.append(analysis_result)
                     
                     # Generate sections for mortgage industry
@@ -2190,21 +2416,30 @@ def analyze_documents():
                 if os.path.exists(temp_path):
                     os.remove(temp_path)
         
-        return jsonify({
+        response_data = {
             'success': True,
             'results': results,
             'sections': sections,
             'industry': industry,
             'total_files': len(files),
             'processed_files': len([r for r in results if r.get('success', False)])
-        })
+        }
+        
+        # Add AI information if used
+        if ai_insights:
+            response_data['ai_enhanced'] = True
+            response_data['ai_insights'] = ai_insights
+            response_data['total_ai_tokens'] = total_tokens_used
+            response_data['ai_cost_estimate'] = f"${(total_tokens_used * 0.00015):.4f}"  # Rough estimate for gpt-4o-mini
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/parse_email', methods=['POST'])
 def parse_email():
-    """Parse lender email for requirements"""
+    """Parse lender email for requirements with AI enhancement"""
     try:
         data = request.get_json()
         content = data.get('content', '')
@@ -2212,14 +2447,25 @@ def parse_email():
         if not content.strip():
             return jsonify({'success': False, 'error': 'No email content provided'})
         
-        # Parse the email content
+        # Standard parsing
         parsed_info = parse_lender_email(content)
+        
+        # AI-Enhanced parsing (if available)
+        ai_enhancement = None
+        if mortgage_ai:
+            ai_result = mortgage_ai.enhance_lender_parsing(content)
+            if ai_result.get('ai_enhanced'):
+                ai_enhancement = {
+                    'enhanced_parsing': ai_result['enhanced_parsing'],
+                    'tokens_used': ai_result['tokens_used'],
+                    'total_tokens': ai_result['total_tokens']
+                }
         
         # Store globally for use in analysis
         global lender_requirements
         lender_requirements = parsed_info
         
-        return jsonify({
+        response_data = {
             'success': True,
             'lender_name': parsed_info['lender_name'],
             'contact_email': parsed_info['contact_email'],
@@ -2228,7 +2474,16 @@ def parse_email():
             'documents': parsed_info['documents'],
             'special_instructions': parsed_info['special_instructions'],
             'total_documents': len(parsed_info['documents'])
-        })
+        }
+        
+        # Add AI enhancement if available
+        if ai_enhancement:
+            response_data['ai_enhanced'] = True
+            response_data['ai_insights'] = ai_enhancement['enhanced_parsing']
+            response_data['ai_tokens_used'] = ai_enhancement['tokens_used']
+            response_data['ai_cost_estimate'] = f"${(ai_enhancement['tokens_used'] * 0.00015):.4f}"
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
