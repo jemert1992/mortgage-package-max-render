@@ -1,8 +1,16 @@
-flask-cors
-pdfplumber
-python-docx
-openpyxl
-pillow
-pytesseract
-requests
-gunicorn
+Flask==3.0.0
+Flask-CORS==4.0.0
+openai==1.91.0
+gunicorn==21.2.0
+
+# Document processing libraries
+pdfplumber==0.10.0
+python-docx==1.1.0
+openpyxl==3.1.2
+Pillow==10.2.0
+pytesseract==0.3.10
+
+# Core dependencies
+requests==2.31.0
+python-dateutil==2.8.2
+
