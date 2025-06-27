@@ -3756,68 +3756,80 @@ def extract_and_reorganize_pages_safe(pdf_path, document_sections):
             doc_name = doc.get('name', f'Document {i+1}')
             organized_pages[doc_name] = []
         
-        # Keep the PDF file open and store the reader globally
-        # This prevents page objects from becoming invalid
-        pdf_file = open(pdf_path, 'rb')
-        pdf_reader = PyPDF2.PdfReader(pdf_file)
-        total_pages = len(pdf_reader.pages)
-        
-        print(f"📄 Total pages in original PDF: {total_pages}")
-        
-        # Limit pages for memory safety
-        max_pages = min(total_pages, 50)  # Limit to 50 pages max
-        if total_pages > max_pages:
-            print(f"⚠️  Limited to {max_pages} pages for memory safety")
-        
-        # Process pages one by one
-        for i in range(max_pages):
-            try:
-                page = pdf_reader.pages[i]
-                
-                # Extract text for classification (first 300 chars)
-                text_sample = ""
-                if hasattr(page, 'extract_text'):
-                    text_sample = page.extract_text()[:300]
-                
-                # Assign page to document
-                assigned_doc = assign_page_to_document_safe(text_sample, document_sections, i)
-                doc_name = document_sections[assigned_doc].get('name', f'Document {assigned_doc+1}')
-                
-                # Store page object and metadata
-                # Keep the file handle and reader reference
-                page_data = {
-                    'page_number': i + 1,
-                    'page_object': page,  # Store the actual page object
-                    'pdf_reader': pdf_reader,  # Keep reference to reader
-                    'pdf_file': pdf_file,  # Keep reference to file
-                    'text_sample': text_sample[:100],  # Keep small sample for reference
-                    'assigned_document': assigned_doc
-                }
-                
-                organized_pages[doc_name].append(page_data)
-                
-                print(f"📄 Page {i+1} assigned to: {doc_name}")
-                
-                # Force cleanup every 10 pages
-                if (i + 1) % 10 == 0:
-                    gc.collect()
-                    print(f"🧠 Memory after {i+1} pages: {get_memory_usage():.1f} MB")
+        # Read PDF and extract pages immediately
+        with open(pdf_path, 'rb') as pdf_file:
+            pdf_reader = PyPDF2.PdfReader(pdf_file)
+            total_pages = len(pdf_reader.pages)
+            
+            print(f"📄 Total pages in original PDF: {total_pages}")
+            
+            # Limit pages for memory safety
+            max_pages = min(total_pages, 50)  # Limit to 50 pages max
+            if total_pages > max_pages:
+                print(f"⚠️  Limited to {max_pages} pages for memory safety")
+            
+            # Create a new PDF writer to store extracted pages
+            temp_pdf_path = pdf_path.replace('.pdf', '_temp_extracted.pdf')
+            temp_pdf_writer = PyPDF2.PdfWriter()
+            
+            # Process pages one by one and store in temp PDF
+            page_assignments = []
+            for i in range(max_pages):
+                try:
+                    page = pdf_reader.pages[i]
                     
-            except Exception as page_error:
-                print(f"⚠️  Error processing page {i+1}: {page_error}")
-                continue
+                    # Extract text for classification (first 300 chars)
+                    text_sample = ""
+                    if hasattr(page, 'extract_text'):
+                        text_sample = page.extract_text()[:300]
+                    
+                    # Assign page to document
+                    assigned_doc = assign_page_to_document_safe(text_sample, document_sections, i)
+                    doc_name = document_sections[assigned_doc].get('name', f'Document {assigned_doc+1}')
+                    
+                    # Add page to temp PDF
+                    temp_pdf_writer.add_page(page)
+                    
+                    # Store assignment info
+                    page_assignments.append({
+                        'page_number': i + 1,
+                        'temp_page_index': i,  # Index in temp PDF
+                        'text_sample': text_sample[:100],
+                        'assigned_document': assigned_doc,
+                        'doc_name': doc_name
+                    })
+                    
+                    print(f"📄 Page {i+1} assigned to: {doc_name}")
+                    
+                    # Force cleanup every 10 pages
+                    if (i + 1) % 10 == 0:
+                        gc.collect()
+                        print(f"🧠 Memory after {i+1} pages: {get_memory_usage():.1f} MB")
+                        
+                except Exception as page_error:
+                    print(f"⚠️  Error processing page {i+1}: {page_error}")
+                    continue
+            
+            # Write temp PDF
+            with open(temp_pdf_path, 'wb') as temp_file:
+                temp_pdf_writer.write(temp_file)
         
-        # Don't close the file here - it will be closed after PDF creation
+        # Now organize the assignments
+        for assignment in page_assignments:
+            doc_name = assignment['doc_name']
+            organized_pages[doc_name].append(assignment)
+        
         return {
             'total_pages': max_pages,
             'organized_pages': organized_pages,
             'processing_method': 'enhanced_with_content',
-            'pdf_file': pdf_file,  # Return file handle to keep it open
-            'pdf_reader': pdf_reader  # Return reader reference
+            'temp_pdf_path': temp_pdf_path  # Path to temp PDF with all pages
         }
         
     except Exception as e:
         print(f"❌ Error in enhanced page extraction: {e}")
+        import traceback
+        print(f"🔍 DEBUG: Extraction traceback: {traceback.format_exc()}")
         return None
 
 
@@ -3933,63 +3945,75 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
         # Add organized document pages
         if reorganized_pages and reorganized_pages.get('organized_pages'):
             organized = reorganized_pages['organized_pages']
-            print(f"🔍 DEBUG: Processing {len(organized)} organized document groups")
+            temp_pdf_path = reorganized_pages.get('temp_pdf_path')
             
-            # Process documents in order
-            for doc_index, doc in enumerate(document_sections):
-                doc_name = doc.get('name', 'Unknown Document')
-                print(f"🔍 DEBUG: Processing document {doc_index+1}: {doc_name}")
-                
-                if doc_name in organized and organized[doc_name]:
-                    pages_for_doc = organized[doc_name]
-                    print(f"📄 Adding {len(pages_for_doc)} pages for: {doc_name}")
+            print(f"🔍 DEBUG: Processing {len(organized)} organized document groups")
+            print(f"🔍 DEBUG: Temp PDF path: {temp_pdf_path}")
+            
+            if temp_pdf_path and os.path.exists(temp_pdf_path):
+                # Open the temp PDF containing all extracted pages
+                with open(temp_pdf_path, 'rb') as temp_file:
+                    temp_reader = PyPDF2.PdfReader(temp_file)
+                    print(f"🔍 DEBUG: Temp PDF has {len(temp_reader.pages)} pages")
                     
-                    # Add document separator page
-                    separator_path = output_path.replace('.pdf', f'_sep_{doc_name.replace(" ", "_")}.pdf')
-                    print(f"🔍 DEBUG: Creating separator at: {separator_path}")
-                    sep_success = create_document_separator_enhanced(separator_path, doc_name, len(pages_for_doc))
-                    print(f"🔍 DEBUG: Separator creation success: {sep_success}")
-                    
-                    if sep_success and os.path.exists(separator_path):
-                        with open(separator_path, 'rb') as sep_file:
-                            sep_reader = PyPDF2.PdfReader(sep_file)
-                            for page in sep_reader.pages:
-                                pdf_writer.add_page(page)
-                                print(f"🔍 DEBUG: Added separator page for {doc_name}")
-                    
-                    # Add actual document pages
-                    print(f"🔍 DEBUG: Adding {len(pages_for_doc)} actual pages for {doc_name}")
-                    for page_index, page_data in enumerate(pages_for_doc):
-                        try:
-                            page_obj = page_data.get('page_object')
-                            if page_obj:
-                                # Use import_page to create a copy of the page
-                                # This prevents issues with closed file handles
-                                imported_page = pdf_writer.import_page(page_obj)
-                                print(f"🔍 DEBUG: Imported page {page_data.get('page_number', page_index+1)} to {doc_name}")
-                            else:
-                                print(f"⚠️  No page object for page {page_index+1} in {doc_name}")
-                        except Exception as page_error:
-                            print(f"⚠️  Error importing page {page_data.get('page_number', page_index+1)}: {page_error}")
-                            # Try alternative method
+                    # Process documents in order
+                    for doc_index, doc in enumerate(document_sections):
+                        doc_name = doc.get('name', 'Unknown Document')
+                        print(f"🔍 DEBUG: Processing document {doc_index+1}: {doc_name}")
+                        
+                        if doc_name in organized and organized[doc_name]:
+                            pages_for_doc = organized[doc_name]
+                            print(f"📄 Adding {len(pages_for_doc)} pages for: {doc_name}")
+                            
+                            # Add document separator page
+                            separator_path = output_path.replace('.pdf', f'_sep_{doc_name.replace(" ", "_")}.pdf')
+                            print(f"🔍 DEBUG: Creating separator at: {separator_path}")
+                            sep_success = create_document_separator_enhanced(separator_path, doc_name, len(pages_for_doc))
+                            print(f"🔍 DEBUG: Separator creation success: {sep_success}")
+                            
+                            if sep_success and os.path.exists(separator_path):
+                                with open(separator_path, 'rb') as sep_file:
+                                    sep_reader = PyPDF2.PdfReader(sep_file)
+                                    for page in sep_reader.pages:
+                                        pdf_writer.add_page(page)
+                                        print(f"🔍 DEBUG: Added separator page for {doc_name}")
+                            
+                            # Add actual document pages from temp PDF
+                            print(f"🔍 DEBUG: Adding {len(pages_for_doc)} actual pages for {doc_name}")
+                            for page_assignment in pages_for_doc:
+                                try:
+                                    temp_page_index = page_assignment.get('temp_page_index')
+                                    if temp_page_index is not None and temp_page_index < len(temp_reader.pages):
+                                        page_obj = temp_reader.pages[temp_page_index]
+                                        pdf_writer.add_page(page_obj)
+                                        print(f"🔍 DEBUG: Added page {page_assignment.get('page_number', temp_page_index+1)} to {doc_name}")
+                                    else:
+                                        print(f"⚠️  Invalid temp page index for page {page_assignment.get('page_number', 'unknown')}")
+                                except Exception as page_error:
+                                    print(f"⚠️  Error adding page {page_assignment.get('page_number', 'unknown')}: {page_error}")
+                                    continue
+                            
+                            # Cleanup temporary separator file
                             try:
-                                pdf_writer.add_page(page_obj)
-                                print(f"🔍 DEBUG: Added page {page_data.get('page_number', page_index+1)} using add_page fallback")
-                            except Exception as fallback_error:
-                                print(f"⚠️  Fallback also failed: {fallback_error}")
-                                continue
-                    
-                    # Cleanup temporary separator file
-                    try:
-                        if os.path.exists(separator_path):
-                            os.remove(separator_path)
-                    except:
-                        pass
-                    
-                    # Memory cleanup after each document
-                    gc.collect()
-                else:
-                    print(f"🔍 DEBUG: No pages found for document: {doc_name}")
+                                if os.path.exists(separator_path):
+                                    os.remove(separator_path)
+                            except:
+                                pass
+                            
+                            # Memory cleanup after each document
+                            gc.collect()
+                        else:
+                            print(f"🔍 DEBUG: No pages found for document: {doc_name}")
+                
+                # Cleanup temp PDF
+                try:
+                    if os.path.exists(temp_pdf_path):
+                        os.remove(temp_pdf_path)
+                        print("🔍 DEBUG: Cleaned up temp PDF")
+                except:
+                    pass
+            else:
+                print("🔍 DEBUG: Temp PDF not available")
         else:
             # Fallback: Create summary if no pages available
             print("📄 No organized pages available - creating document summary")
@@ -4002,14 +4026,6 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
         print(f"🔍 DEBUG: Writing final PDF to: {output_path}")
         with open(output_path, 'wb') as output_file:
             pdf_writer.write(output_file)
-        
-        # Close the original PDF file handle if it exists
-        if reorganized_pages and 'pdf_file' in reorganized_pages:
-            try:
-                reorganized_pages['pdf_file'].close()
-                print("🔍 DEBUG: Closed original PDF file handle")
-            except Exception as close_error:
-                print(f"⚠️  Error closing PDF file: {close_error}")
         
         # Verify the written file
         if os.path.exists(output_path):
