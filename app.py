@@ -2686,6 +2686,7 @@ def index():
         let mortgageWorkflowStep = 1;
         let lastAnalysisResults = null;
         let lastLenderRequirements = null;
+        let uploadedPdfPath = null; // Track the uploaded PDF path for reorganization
 
         // Industry selection
         document.querySelectorAll('.industry-card').forEach(card => {
@@ -2858,7 +2859,7 @@ def index():
             const reorganizationData = {
                 document_sections: lastAnalysisResults?.sections || [],
                 lender_requirements: lastLenderRequirements || {},
-                original_pdf_path: '' // Will be handled by backend
+                original_pdf_path: uploadedPdfPath || '' // Use the tracked PDF path
             };
             
             // Call PDF reorganization endpoint
@@ -3129,6 +3130,11 @@ def index():
             const formData = new FormData();
             selectedFiles.forEach(file => {
                 formData.append('files', file);
+                // Track the first PDF file for reorganization
+                if (file.type === 'application/pdf' && !uploadedPdfPath) {
+                    uploadedPdfPath = `/tmp/${file.name}`;
+                    console.log('🔍 Tracked PDF path for reorganization:', uploadedPdfPath);
+                }
             });
             formData.append('industry', selectedIndustry);
 
