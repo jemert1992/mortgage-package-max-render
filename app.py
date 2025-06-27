@@ -3720,65 +3720,72 @@ def extract_and_reorganize_pages_safe(pdf_path, document_sections):
         
         print(f"📄 Starting enhanced page extraction from {pdf_path}")
         
-        # Open PDF with memory safety
-        with open(pdf_path, 'rb') as file:
-            pdf_reader = PyPDF2.PdfReader(file)
-            total_pages = len(pdf_reader.pages)
-            
-            print(f"📄 Total pages in original PDF: {total_pages}")
-            
-            # Limit pages for memory safety
-            max_pages = min(total_pages, 50)  # Limit to 50 pages max
-            if total_pages > max_pages:
-                print(f"⚠️  Limited to {max_pages} pages for memory safety")
-            
-            # Extract pages with content preservation
-            organized_pages = {}
-            for i, doc in enumerate(document_sections):
-                doc_name = doc.get('name', f'Document {i+1}')
-                organized_pages[doc_name] = []
-            
-            # Process pages one by one
-            for i in range(max_pages):
-                try:
-                    page = pdf_reader.pages[i]
+        # Initialize organized pages structure
+        organized_pages = {}
+        for i, doc in enumerate(document_sections):
+            doc_name = doc.get('name', f'Document {i+1}')
+            organized_pages[doc_name] = []
+        
+        # Keep the PDF file open and store the reader globally
+        # This prevents page objects from becoming invalid
+        pdf_file = open(pdf_path, 'rb')
+        pdf_reader = PyPDF2.PdfReader(pdf_file)
+        total_pages = len(pdf_reader.pages)
+        
+        print(f"📄 Total pages in original PDF: {total_pages}")
+        
+        # Limit pages for memory safety
+        max_pages = min(total_pages, 50)  # Limit to 50 pages max
+        if total_pages > max_pages:
+            print(f"⚠️  Limited to {max_pages} pages for memory safety")
+        
+        # Process pages one by one
+        for i in range(max_pages):
+            try:
+                page = pdf_reader.pages[i]
+                
+                # Extract text for classification (first 300 chars)
+                text_sample = ""
+                if hasattr(page, 'extract_text'):
+                    text_sample = page.extract_text()[:300]
+                
+                # Assign page to document
+                assigned_doc = assign_page_to_document_safe(text_sample, document_sections, i)
+                doc_name = document_sections[assigned_doc].get('name', f'Document {assigned_doc+1}')
+                
+                # Store page object and metadata
+                # Keep the file handle and reader reference
+                page_data = {
+                    'page_number': i + 1,
+                    'page_object': page,  # Store the actual page object
+                    'pdf_reader': pdf_reader,  # Keep reference to reader
+                    'pdf_file': pdf_file,  # Keep reference to file
+                    'text_sample': text_sample[:100],  # Keep small sample for reference
+                    'assigned_document': assigned_doc
+                }
+                
+                organized_pages[doc_name].append(page_data)
+                
+                print(f"📄 Page {i+1} assigned to: {doc_name}")
+                
+                # Force cleanup every 10 pages
+                if (i + 1) % 10 == 0:
+                    gc.collect()
+                    print(f"🧠 Memory after {i+1} pages: {get_memory_usage():.1f} MB")
                     
-                    # Extract text for classification (first 300 chars)
-                    text_sample = ""
-                    if hasattr(page, 'extract_text'):
-                        text_sample = page.extract_text()[:300]
-                    
-                    # Assign page to document
-                    assigned_doc = assign_page_to_document_safe(text_sample, document_sections, i)
-                    doc_name = document_sections[assigned_doc].get('name', f'Document {assigned_doc+1}')
-                    
-                    # Store page object and metadata
-                    page_data = {
-                        'page_number': i + 1,
-                        'page_object': page,  # Store the actual page object
-                        'text_sample': text_sample[:100],  # Keep small sample for reference
-                        'assigned_document': assigned_doc
-                    }
-                    
-                    organized_pages[doc_name].append(page_data)
-                    
-                    print(f"📄 Page {i+1} assigned to: {doc_name}")
-                    
-                    # Force cleanup every 10 pages
-                    if (i + 1) % 10 == 0:
-                        gc.collect()
-                        print(f"🧠 Memory after {i+1} pages: {get_memory_usage():.1f} MB")
-                        
-                except Exception as page_error:
-                    print(f"⚠️  Error processing page {i+1}: {page_error}")
-                    continue
-            
-            return {
-                'total_pages': max_pages,
-                'organized_pages': organized_pages,
-                'processing_method': 'enhanced_with_content'
-            }
-            
+            except Exception as page_error:
+                print(f"⚠️  Error processing page {i+1}: {page_error}")
+                continue
+        
+        # Don't close the file here - it will be closed after PDF creation
+        return {
+            'total_pages': max_pages,
+            'organized_pages': organized_pages,
+            'processing_method': 'enhanced_with_content',
+            'pdf_file': pdf_file,  # Return file handle to keep it open
+            'pdf_reader': pdf_reader  # Return reader reference
+        }
+        
     except Exception as e:
         print(f"❌ Error in enhanced page extraction: {e}")
         return None
@@ -3926,13 +3933,21 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
                         try:
                             page_obj = page_data.get('page_object')
                             if page_obj:
-                                pdf_writer.add_page(page_obj)
-                                print(f"🔍 DEBUG: Added page {page_data.get('page_number', page_index+1)} to {doc_name}")
+                                # Use import_page to create a copy of the page
+                                # This prevents issues with closed file handles
+                                imported_page = pdf_writer.import_page(page_obj)
+                                print(f"🔍 DEBUG: Imported page {page_data.get('page_number', page_index+1)} to {doc_name}")
                             else:
                                 print(f"⚠️  No page object for page {page_index+1} in {doc_name}")
                         except Exception as page_error:
-                            print(f"⚠️  Error adding page {page_data.get('page_number', page_index+1)}: {page_error}")
-                            continue
+                            print(f"⚠️  Error importing page {page_data.get('page_number', page_index+1)}: {page_error}")
+                            # Try alternative method
+                            try:
+                                pdf_writer.add_page(page_obj)
+                                print(f"🔍 DEBUG: Added page {page_data.get('page_number', page_index+1)} using add_page fallback")
+                            except Exception as fallback_error:
+                                print(f"⚠️  Fallback also failed: {fallback_error}")
+                                continue
                     
                     # Cleanup temporary separator file
                     try:
@@ -3957,6 +3972,14 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
         print(f"🔍 DEBUG: Writing final PDF to: {output_path}")
         with open(output_path, 'wb') as output_file:
             pdf_writer.write(output_file)
+        
+        # Close the original PDF file handle if it exists
+        if reorganized_pages and 'pdf_file' in reorganized_pages:
+            try:
+                reorganized_pages['pdf_file'].close()
+                print("🔍 DEBUG: Closed original PDF file handle")
+            except Exception as close_error:
+                print(f"⚠️  Error closing PDF file: {close_error}")
         
         # Verify the written file
         if os.path.exists(output_path):
