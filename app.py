@@ -3658,8 +3658,39 @@ def reorganize_pdf():
         print(f"🔍 DEBUG: Output path will be: {output_path}")
         
         # Check if we have an original PDF to work with
-        has_original_pdf = original_pdf_path and os.path.exists(original_pdf_path)
-        print(f"🔍 DEBUG: Has original PDF: {has_original_pdf}")
+        print(f"🔍 DEBUG: Checking original PDF path: '{original_pdf_path}'")
+        print(f"🔍 DEBUG: Path is not empty: {bool(original_pdf_path)}")
+        
+        if original_pdf_path:
+            print(f"🔍 DEBUG: Checking if file exists: {original_pdf_path}")
+            file_exists = os.path.exists(original_pdf_path)
+            print(f"🔍 DEBUG: File exists: {file_exists}")
+            
+            if not file_exists:
+                # Try to find the file in /tmp directory
+                print("🔍 DEBUG: File not found, checking /tmp directory...")
+                tmp_files = os.listdir('/tmp')
+                pdf_files = [f for f in tmp_files if f.lower().endswith('.pdf')]
+                print(f"🔍 DEBUG: PDF files in /tmp: {pdf_files}")
+                
+                # Try to find a matching file
+                filename = os.path.basename(original_pdf_path)
+                print(f"🔍 DEBUG: Looking for filename: {filename}")
+                
+                if filename in pdf_files:
+                    original_pdf_path = f"/tmp/{filename}"
+                    print(f"🔍 DEBUG: Found file, updated path: {original_pdf_path}")
+                    file_exists = True
+                elif pdf_files:
+                    # Use the first PDF file found
+                    original_pdf_path = f"/tmp/{pdf_files[0]}"
+                    print(f"🔍 DEBUG: Using first PDF found: {original_pdf_path}")
+                    file_exists = True
+        else:
+            file_exists = False
+            
+        has_original_pdf = original_pdf_path and file_exists
+        print(f"🔍 DEBUG: Final decision - Has original PDF: {has_original_pdf}")
         
         if has_original_pdf:
             print(f"📄 Processing original PDF: {original_pdf_path}")
