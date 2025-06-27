@@ -3612,6 +3612,8 @@ def reorganize_pdf():
         original_pdf_path = data.get('original_pdf_path', '')
         
         print("📄 MEMORY-SAFE PDF REORGANIZATION - Real page extraction enabled")
+        print(f"🔍 DEBUG: Received {len(document_sections)} document sections")
+        print(f"🔍 DEBUG: Original PDF path: {original_pdf_path}")
         
         # Validate input data
         if not document_sections:
@@ -3631,12 +3633,22 @@ def reorganize_pdf():
         output_filename = f"reorganized_mortgage_package_{timestamp}.pdf"
         output_path = os.path.join(output_dir, output_filename)
         
+        print(f"🔍 DEBUG: Output path will be: {output_path}")
+        
         # Check if we have an original PDF to work with
         has_original_pdf = original_pdf_path and os.path.exists(original_pdf_path)
+        print(f"🔍 DEBUG: Has original PDF: {has_original_pdf}")
         
         if has_original_pdf:
             print(f"📄 Processing original PDF: {original_pdf_path}")
             reorganized_pages = extract_and_reorganize_pages_safe(original_pdf_path, document_sections)
+            print(f"🔍 DEBUG: Page extraction result: {reorganized_pages is not None}")
+            if reorganized_pages:
+                print(f"🔍 DEBUG: Total pages extracted: {reorganized_pages.get('total_pages', 0)}")
+                organized = reorganized_pages.get('organized_pages', {})
+                print(f"🔍 DEBUG: Organized pages keys: {list(organized.keys())}")
+                for doc_name, pages in organized.items():
+                    print(f"🔍 DEBUG: {doc_name}: {len(pages)} pages")
         else:
             print("📄 No original PDF - creating document summary")
             reorganized_pages = None
@@ -3644,7 +3656,15 @@ def reorganize_pdf():
         print(f"🧠 Memory after page processing: {get_memory_usage():.1f} MB")
         
         # Create the reorganized PDF
+        print("🔍 DEBUG: Starting PDF creation...")
         success = create_reorganized_pdf_safe(output_path, document_sections, reorganized_pages, lender_requirements)
+        print(f"🔍 DEBUG: PDF creation success: {success}")
+        
+        if success and os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            print(f"🔍 DEBUG: Created PDF size: {file_size} bytes")
+        else:
+            print(f"🔍 DEBUG: PDF file exists: {os.path.exists(output_path) if output_path else 'No path'}")
         
         if not success:
             return jsonify({
@@ -3846,68 +3866,118 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
     """Create reorganized PDF including actual pages from original PDF"""
     try:
         print(f"📄 Creating enhanced reorganized PDF with actual pages: {output_path}")
+        print(f"🔍 DEBUG: Document sections count: {len(document_sections)}")
+        print(f"🔍 DEBUG: Reorganized pages available: {reorganized_pages is not None}")
         
         # Create PDF writer
         import PyPDF2
         pdf_writer = PyPDF2.PdfWriter()
+        print("🔍 DEBUG: PDF writer created")
         
         # Create cover page using reportlab
         cover_path = output_path.replace('.pdf', '_cover.pdf')
-        create_cover_page_enhanced(cover_path, document_sections, reorganized_pages, lender_requirements)
+        print(f"🔍 DEBUG: Creating cover page at: {cover_path}")
+        cover_success = create_cover_page_enhanced(cover_path, document_sections, reorganized_pages, lender_requirements)
+        print(f"🔍 DEBUG: Cover page creation success: {cover_success}")
         
         # Add cover page to final PDF
-        with open(cover_path, 'rb') as cover_file:
-            cover_reader = PyPDF2.PdfReader(cover_file)
-            for page in cover_reader.pages:
-                pdf_writer.add_page(page)
+        if cover_success and os.path.exists(cover_path):
+            print("🔍 DEBUG: Adding cover page to PDF")
+            with open(cover_path, 'rb') as cover_file:
+                cover_reader = PyPDF2.PdfReader(cover_file)
+                cover_page_count = len(cover_reader.pages)
+                print(f"🔍 DEBUG: Cover has {cover_page_count} pages")
+                for i, page in enumerate(cover_reader.pages):
+                    pdf_writer.add_page(page)
+                    print(f"🔍 DEBUG: Added cover page {i+1}")
+        else:
+            print("🔍 DEBUG: Cover page not available, skipping")
         
         # Add organized document pages
         if reorganized_pages and reorganized_pages.get('organized_pages'):
             organized = reorganized_pages['organized_pages']
+            print(f"🔍 DEBUG: Processing {len(organized)} organized document groups")
             
             # Process documents in order
-            for doc in document_sections:
+            for doc_index, doc in enumerate(document_sections):
                 doc_name = doc.get('name', 'Unknown Document')
+                print(f"🔍 DEBUG: Processing document {doc_index+1}: {doc_name}")
                 
                 if doc_name in organized and organized[doc_name]:
-                    print(f"📄 Adding {len(organized[doc_name])} pages for: {doc_name}")
+                    pages_for_doc = organized[doc_name]
+                    print(f"📄 Adding {len(pages_for_doc)} pages for: {doc_name}")
                     
                     # Add document separator page
                     separator_path = output_path.replace('.pdf', f'_sep_{doc_name.replace(" ", "_")}.pdf')
-                    create_document_separator_enhanced(separator_path, doc_name, len(organized[doc_name]))
+                    print(f"🔍 DEBUG: Creating separator at: {separator_path}")
+                    sep_success = create_document_separator_enhanced(separator_path, doc_name, len(pages_for_doc))
+                    print(f"🔍 DEBUG: Separator creation success: {sep_success}")
                     
-                    with open(separator_path, 'rb') as sep_file:
-                        sep_reader = PyPDF2.PdfReader(sep_file)
-                        for page in sep_reader.pages:
-                            pdf_writer.add_page(page)
+                    if sep_success and os.path.exists(separator_path):
+                        with open(separator_path, 'rb') as sep_file:
+                            sep_reader = PyPDF2.PdfReader(sep_file)
+                            for page in sep_reader.pages:
+                                pdf_writer.add_page(page)
+                                print(f"🔍 DEBUG: Added separator page for {doc_name}")
                     
                     # Add actual document pages
-                    for page_data in organized[doc_name]:
+                    print(f"🔍 DEBUG: Adding {len(pages_for_doc)} actual pages for {doc_name}")
+                    for page_index, page_data in enumerate(pages_for_doc):
                         try:
-                            pdf_writer.add_page(page_data['page_object'])
+                            page_obj = page_data.get('page_object')
+                            if page_obj:
+                                pdf_writer.add_page(page_obj)
+                                print(f"🔍 DEBUG: Added page {page_data.get('page_number', page_index+1)} to {doc_name}")
+                            else:
+                                print(f"⚠️  No page object for page {page_index+1} in {doc_name}")
                         except Exception as page_error:
-                            print(f"⚠️  Error adding page {page_data['page_number']}: {page_error}")
+                            print(f"⚠️  Error adding page {page_data.get('page_number', page_index+1)}: {page_error}")
                             continue
                     
                     # Cleanup temporary separator file
                     try:
-                        os.remove(separator_path)
+                        if os.path.exists(separator_path):
+                            os.remove(separator_path)
                     except:
                         pass
                     
                     # Memory cleanup after each document
                     gc.collect()
+                else:
+                    print(f"🔍 DEBUG: No pages found for document: {doc_name}")
         else:
             # Fallback: Create summary if no pages available
             print("📄 No organized pages available - creating document summary")
             
+        # Check how many pages we have before writing
+        total_pages_to_write = len(pdf_writer.pages)
+        print(f"🔍 DEBUG: Total pages to write: {total_pages_to_write}")
+        
         # Write final PDF
+        print(f"🔍 DEBUG: Writing final PDF to: {output_path}")
         with open(output_path, 'wb') as output_file:
             pdf_writer.write(output_file)
         
+        # Verify the written file
+        if os.path.exists(output_path):
+            file_size = os.path.getsize(output_path)
+            print(f"🔍 DEBUG: Written PDF size: {file_size} bytes")
+            
+            # Verify page count in written file
+            try:
+                with open(output_path, 'rb') as verify_file:
+                    verify_reader = PyPDF2.PdfReader(verify_file)
+                    written_page_count = len(verify_reader.pages)
+                    print(f"🔍 DEBUG: Verified page count in written PDF: {written_page_count}")
+            except Exception as verify_error:
+                print(f"⚠️  Error verifying written PDF: {verify_error}")
+        else:
+            print("❌ DEBUG: Output file does not exist after writing!")
+        
         # Cleanup temporary cover file
         try:
-            os.remove(cover_path)
+            if os.path.exists(cover_path):
+                os.remove(cover_path)
         except:
             pass
         
@@ -3916,6 +3986,8 @@ def create_reorganized_pdf_safe(output_path, document_sections, reorganized_page
         
     except Exception as e:
         print(f"❌ Error creating enhanced PDF: {e}")
+        import traceback
+        print(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
         # Fallback to simple PDF creation
         return create_simple_pdf_fallback(output_path, document_sections, reorganized_pages, lender_requirements)
 
