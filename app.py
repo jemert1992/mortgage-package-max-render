@@ -3600,13 +3600,27 @@ def parse_email():
 def reorganize_pdf():
     """Memory-safe PDF reorganization with actual page extraction"""
     try:
+        print("🔍 DEBUG: reorganize_pdf endpoint called")
         print(f"🧠 Memory at start: {get_memory_usage():.1f} MB")
         
         # Force garbage collection at start
         gc.collect()
         
         # Get request data with memory safety
-        data = request.get_json()
+        print("🔍 DEBUG: Getting request data...")
+        try:
+            data = request.get_json()
+            print(f"🔍 DEBUG: Request data received: {data is not None}")
+        except Exception as json_error:
+            print(f"❌ DEBUG: JSON parsing error: {json_error}")
+            return jsonify({'success': False, 'error': f'Invalid JSON data: {str(json_error)}'})
+        
+        if not data:
+            print("❌ DEBUG: No data received in request")
+            return jsonify({'success': False, 'error': 'No data received'})
+        
+        print(f"🔍 DEBUG: Data keys: {list(data.keys()) if data else 'None'}")
+        
         document_sections = data.get('document_sections', [])
         lender_requirements = data.get('lender_requirements', {})
         original_pdf_path = data.get('original_pdf_path', '')
@@ -3617,6 +3631,7 @@ def reorganize_pdf():
         
         # Validate input data
         if not document_sections:
+            print("❌ DEBUG: No document sections provided")
             return jsonify({'success': False, 'error': 'No document sections provided'})
         
         # Limit document sections for memory safety
@@ -3625,6 +3640,7 @@ def reorganize_pdf():
             print(f"⚠️  Limited to {len(document_sections)} documents for memory safety")
         
         # Create output directory
+        print("🔍 DEBUG: Creating output directory...")
         output_dir = "/tmp/pdf_reorganization"
         os.makedirs(output_dir, exist_ok=True)
         
@@ -3641,14 +3657,20 @@ def reorganize_pdf():
         
         if has_original_pdf:
             print(f"📄 Processing original PDF: {original_pdf_path}")
-            reorganized_pages = extract_and_reorganize_pages_safe(original_pdf_path, document_sections)
-            print(f"🔍 DEBUG: Page extraction result: {reorganized_pages is not None}")
-            if reorganized_pages:
-                print(f"🔍 DEBUG: Total pages extracted: {reorganized_pages.get('total_pages', 0)}")
-                organized = reorganized_pages.get('organized_pages', {})
-                print(f"🔍 DEBUG: Organized pages keys: {list(organized.keys())}")
-                for doc_name, pages in organized.items():
-                    print(f"🔍 DEBUG: {doc_name}: {len(pages)} pages")
+            try:
+                reorganized_pages = extract_and_reorganize_pages_safe(original_pdf_path, document_sections)
+                print(f"🔍 DEBUG: Page extraction result: {reorganized_pages is not None}")
+                if reorganized_pages:
+                    print(f"🔍 DEBUG: Total pages extracted: {reorganized_pages.get('total_pages', 0)}")
+                    organized = reorganized_pages.get('organized_pages', {})
+                    print(f"🔍 DEBUG: Organized pages keys: {list(organized.keys())}")
+                    for doc_name, pages in organized.items():
+                        print(f"🔍 DEBUG: {doc_name}: {len(pages)} pages")
+            except Exception as extraction_error:
+                print(f"❌ DEBUG: Page extraction failed: {extraction_error}")
+                import traceback
+                print(f"🔍 DEBUG: Extraction traceback: {traceback.format_exc()}")
+                reorganized_pages = None
         else:
             print("📄 No original PDF - creating document summary")
             reorganized_pages = None
@@ -3657,8 +3679,14 @@ def reorganize_pdf():
         
         # Create the reorganized PDF
         print("🔍 DEBUG: Starting PDF creation...")
-        success = create_reorganized_pdf_safe(output_path, document_sections, reorganized_pages, lender_requirements)
-        print(f"🔍 DEBUG: PDF creation success: {success}")
+        try:
+            success = create_reorganized_pdf_safe(output_path, document_sections, reorganized_pages, lender_requirements)
+            print(f"🔍 DEBUG: PDF creation success: {success}")
+        except Exception as pdf_error:
+            print(f"❌ DEBUG: PDF creation failed: {pdf_error}")
+            import traceback
+            print(f"🔍 DEBUG: PDF creation traceback: {traceback.format_exc()}")
+            success = False
         
         if success and os.path.exists(output_path):
             file_size = os.path.getsize(output_path)
@@ -3705,6 +3733,8 @@ def reorganize_pdf():
         # Force cleanup on error
         gc.collect()
         print(f"❌ Error in reorganize_pdf: {str(e)}")
+        import traceback
+        print(f"🔍 DEBUG: Full endpoint traceback: {traceback.format_exc()}")
         print(f"🧠 Memory after error: {get_memory_usage():.1f} MB")
         return jsonify({
             'success': False, 
