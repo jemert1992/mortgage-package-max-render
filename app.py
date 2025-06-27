@@ -3526,9 +3526,15 @@ def analyze_documents():
                     })
                     
             finally:
-                # Clean up temporary file
-                if os.path.exists(temp_path):
-                    os.remove(temp_path)
+                # For mortgage industry, preserve PDF files for reorganization
+                if industry == 'mortgage' and file.filename.lower().endswith('.pdf'):
+                    print(f"🔍 DEBUG: Preserving PDF file for reorganization: {temp_path}")
+                    # Don't delete PDF files - they'll be needed for reorganization
+                else:
+                    # Clean up non-PDF temporary files
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                        print(f"🔍 DEBUG: Cleaned up temp file: {temp_path}")
         
         response_data = {
             'success': True,
@@ -3758,6 +3764,14 @@ def reorganize_pdf():
             'processing_method': 'memory_safe_extraction' if has_original_pdf else 'document_summary',
             'pages_processed': reorganized_pages['total_pages'] if reorganized_pages else 0
         }
+        
+        # Clean up preserved PDF file after reorganization
+        if has_original_pdf and os.path.exists(original_pdf_path):
+            try:
+                os.remove(original_pdf_path)
+                print(f"🔍 DEBUG: Cleaned up preserved PDF: {original_pdf_path}")
+            except Exception as cleanup_error:
+                print(f"⚠️  DEBUG: Could not clean up PDF: {cleanup_error}")
         
         # Force memory cleanup before returning
         gc.collect()
