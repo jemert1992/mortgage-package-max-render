@@ -6,7 +6,6 @@ A sleek, professional tool for reorganizing mortgage documents based on lender r
 
 import os
 import json
-import re
 import tempfile
 import traceback
 import gc
@@ -48,7 +47,6 @@ except Exception as e:
 
 print("✅ Mortgage Package Reorganizer - Professional Edition initialized")
 print("🏠 PROFESSIONAL MORTGAGE EDITION - 2025-01-07")
-
 # Enhanced HTML template with professional mortgage-focused design
 HTML_TEMPLATE = """
 <!DOCTYPE html>
@@ -809,7 +807,7 @@ HTML_TEMPLATE = """
 
         <!-- Footer -->
         <div class="footer">
-            <p>© 2025 Mortgage Package Reorganizer • Professional Document Organization • Powered by AI</p>
+            <p>&copy; 2025 Mortgage Package Reorganizer • Professional Document Organization • Powered by AI</p>
         </div>
     </div>
 
@@ -1279,16 +1277,9 @@ MORTGAGE_DOCUMENT_KEYWORDS = {
     ]
 }
 
-# Section-specific keywords for boundary detection
-SECTION_KEYWORDS = {
-    "closing_instructions": ["closing instructions", "settlement agent acknowledgment"],
-    "mortgage_heloc": ["mortgage", "heloc", "deed of trust", "promissory note", "signature"],
-    "supporting_documents": ["flood notice", "w-9", "ssa-89", "4506-c", "anti-coercion"]
-}
-
-def extract_and_reorganize_pages_safe(original_pdf_path, document_sections, lender_requirements):
+def extract_and_reorganize_pages_safe(original_pdf_path, document_sections):
     """
-    Safely extract and reorganize pages from the original PDF with section boundary detection
+    Safely extract and reorganize pages from the original PDF
     """
     print(f"🔍 DEBUG: Starting page extraction from: {original_pdf_path}")
     
@@ -1313,10 +1304,10 @@ def extract_and_reorganize_pages_safe(original_pdf_path, document_sections, lend
             for page_num in range(min(total_pages, 100)):  # Increased limit to 100 pages
                 try:
                     page = pdf_reader.pages[page_num]
-                    page_text = page.extract_text() or ""
+                    page_text = page.extract_text()
                     
-                    # Assign page to document type with section boundary awareness
-                    assigned_doc = assign_page_to_document_safe(page_text, document_sections, lender_requirements)
+                    # Assign page to document type
+                    assigned_doc = assign_page_to_document_safe(page_text, document_sections)
                     
                     # Add page to temp PDF
                     temp_pdf_writer.add_page(page)
@@ -1356,36 +1347,30 @@ def extract_and_reorganize_pages_safe(original_pdf_path, document_sections, lend
         traceback.print_exc()
         return []
 
-def assign_page_to_document_safe(page_text, document_sections, lender_requirements):
+def assign_page_to_document_safe(page_text, document_sections):
     """
-    Safely assign a page to a document type based on content analysis with section boundary detection
+    Safely assign a page to a document type based on content analysis
     """
     if not page_text:
-        return "supporting_documents"
+        return "miscellaneous"
     
     page_text_lower = page_text.lower()
     
-    # Detect section boundaries first
-    for section, keywords in SECTION_KEYWORDS.items():
-        if any(keyword in page_text_lower for keyword in keywords):
-            return section
-
-    # Score based on mortgage keywords
+    # Score each document type
     scores = {}
+    
     for doc_type, keywords in MORTGAGE_DOCUMENT_KEYWORDS.items():
-        score = sum(1 for keyword in keywords if keyword.lower() in page_text_lower)
+        score = 0
+        for keyword in keywords:
+            if keyword.lower() in page_text_lower:
+                score += 1
         scores[doc_type] = score
     
     # Find the document type with the highest score
-    if scores and max(scores.values()) > 0:
+    if scores:
         best_match = max(scores, key=scores.get)
-        return best_match
-    
-    # Fallback to lender-specified order if available
-    if lender_requirements.get('document_order'):
-        for doc in lender_requirements['document_order']:
-            if doc.lower().replace(" ", "_") in page_text_lower:
-                return doc.lower().replace(" ", "_")
+        if scores[best_match] > 0:
+            return best_match
     
     # Fallback to document sections if provided
     if document_sections:
@@ -1395,10 +1380,9 @@ def assign_page_to_document_safe(page_text, document_sections, lender_requiremen
                 return section_title.replace(' ', '_')
     
     return "supporting_documents"
-
 def create_reorganized_pdf_safe(page_extraction_result, document_sections, lender_requirements, output_path):
     """
-    Create the final reorganized PDF with structured sections and table of contents
+    Create the final reorganized PDF with actual pages
     """
     print(f"🔍 DEBUG: Starting PDF creation at: {output_path}")
     
@@ -1413,16 +1397,10 @@ def create_reorganized_pdf_safe(page_extraction_result, document_sections, lende
             pdf_writer.add_page(cover_pdf.pages[0])
             print("🔍 DEBUG: Added cover page")
         
-        # Add table of contents
-        toc_buffer = create_table_of_contents(document_sections, lender_requirements)
-        if toc_buffer:
-            toc_pdf = PyPDF2.PdfReader(toc_buffer)
-            pdf_writer.add_page(toc_pdf.pages[0])
-            print("🔍 DEBUG: Added table of contents")
-        
         # Check if we have page extraction results
         if not page_extraction_result or 'temp_pdf_path' not in page_extraction_result:
             print("🔍 DEBUG: No page extraction results, creating summary only")
+            # Write PDF with just cover page
             with open(output_path, 'wb') as output_file:
                 pdf_writer.write(output_file)
             return True
@@ -1438,11 +1416,6 @@ def create_reorganized_pdf_safe(page_extraction_result, document_sections, lende
             with open(temp_pdf_path, 'rb') as temp_file:
                 temp_pdf_reader = PyPDF2.PdfReader(temp_file)
                 
-                # Define reorganization order based on lender requirements
-                reorganization_order = lender_requirements.get('document_order', [
-                    "closing_instructions", "mortgage_heloc", "supporting_documents"
-                ])
-                
                 # Group pages by document type
                 document_groups = {}
                 for assignment in page_assignments:
@@ -1454,26 +1427,24 @@ def create_reorganized_pdf_safe(page_extraction_result, document_sections, lende
                 print(f"🔍 DEBUG: Document groups: {list(document_groups.keys())}")
                 
                 # Add pages in organized order
-                for doc_type in reorganization_order:
-                    if doc_type in document_groups:
-                        assignments = document_groups[doc_type]
-                        # Add document separator
-                        separator_buffer = create_document_separator_enhanced(doc_type, len(assignments))
-                        if separator_buffer:
-                            separator_pdf = PyPDF2.PdfReader(separator_buffer)
-                            pdf_writer.add_page(separator_pdf.pages[0])
-                            print(f"🔍 DEBUG: Added separator for: {doc_type}")
-                        
-                        # Add actual pages for this document type
-                        for assignment in assignments:
-                            temp_page_index = assignment['temp_page_index']
-                            if temp_page_index < len(temp_pdf_reader.pages):
-                                try:
-                                    page = temp_pdf_reader.pages[temp_page_index]
-                                    pdf_writer.add_page(page)
-                                    print(f"🔍 DEBUG: Added page {assignment['page_number'] + 1} to {doc_type}")
-                                except Exception as e:
-                                    print(f"🔍 DEBUG: Error adding page {temp_page_index}: {e}")
+                for doc_type, assignments in document_groups.items():
+                    # Add document separator
+                    separator_buffer = create_document_separator_enhanced(doc_type, len(assignments))
+                    if separator_buffer:
+                        separator_pdf = PyPDF2.PdfReader(separator_buffer)
+                        pdf_writer.add_page(separator_pdf.pages[0])
+                        print(f"🔍 DEBUG: Added separator for: {doc_type}")
+                    
+                    # Add actual pages for this document type
+                    for assignment in assignments:
+                        temp_page_index = assignment['temp_page_index']
+                        if temp_page_index < len(temp_pdf_reader.pages):
+                            try:
+                                page = temp_pdf_reader.pages[temp_page_index]
+                                pdf_writer.add_page(page)
+                                print(f"🔍 DEBUG: Added page {assignment['page_number'] + 1} to {doc_type}")
+                            except Exception as e:
+                                print(f"🔍 DEBUG: Error adding page {temp_page_index}: {e}")
                 
                 print(f"🔍 DEBUG: Total pages in final PDF: {len(pdf_writer.pages)}")
                 
@@ -1533,7 +1504,7 @@ def create_cover_page_enhanced(document_sections, lender_requirements):
         story.append(Spacer(1, 0.5*inch))
         
         # Processing information
-        story.append(Paragraph(f"<b>Processing Date:</b> {datetime.now().strftime('%B %d, %Y %I:%M %p EDT')}", styles['Normal']))
+        story.append(Paragraph(f"<b>Processing Date:</b> {datetime.now().strftime('%B %d, %Y')}", styles['Normal']))
         story.append(Paragraph(f"<b>Total Document Sections:</b> {len(document_sections) if document_sections else 'N/A'}", styles['Normal']))
         story.append(Spacer(1, 0.3*inch))
         
@@ -1557,43 +1528,6 @@ def create_cover_page_enhanced(document_sections, lender_requirements):
     except Exception as e:
         print(f"Error creating cover page: {e}")
         return None
-
-def create_table_of_contents(document_sections, lender_requirements):
-    """
-    Create a dynamic table of contents
-    """
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer, pagesize=letter)
-    styles = getSampleStyleSheet()
-    story = []
-
-    toc_style = ParagraphStyle(
-        'TOCTitle',
-        parent=styles['Heading1'],
-        fontSize=18,
-        spaceAfter=15,
-        textColor=HexColor('#2c3e50'),
-        alignment=1
-    )
-    item_style = ParagraphStyle(
-        'TOCItem',
-        parent=styles['Normal'],
-        fontSize=12,
-        spaceAfter=10,
-        textColor=HexColor('#34495e')
-    )
-
-    story.append(Paragraph("📑 Table of Contents", toc_style))
-    story.append(Spacer(1, 0.5*inch))
-
-    for section in document_sections:
-        title = section.get('title', 'Untitled').replace('_', ' ').title()
-        pages = section.get('pages', 'N/A')
-        story.append(Paragraph(f"{title} - {pages} pages", item_style))
-
-    doc.build(story)
-    buffer.seek(0)
-    return buffer
 
 def create_document_separator_enhanced(document_type, page_count):
     """
@@ -1654,7 +1588,6 @@ def classify_mortgage_document(text_content):
         return "Disclosures"
     else:
         return "Supporting Documents"
-
 # Flask routes
 @app.route('/')
 def index():
@@ -1701,6 +1634,7 @@ def parse_email():
         
         try:
             # Try to extract JSON from the response
+            import re
             json_match = re.search(r'\{.*\}', ai_response, re.DOTALL)
             if json_match:
                 requirements = json.loads(json_match.group())
@@ -1825,7 +1759,6 @@ def analyze_documents():
         print(f"Error in document analysis: {e}")
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)})
-
 @app.route('/reorganize_pdf', methods=['POST'])
 def reorganize_pdf():
     """Reorganize PDF based on lender requirements"""
@@ -1885,7 +1818,7 @@ def reorganize_pdf():
             try:
                 # Extract and reorganize pages
                 print("🔍 DEBUG: Starting page extraction...")
-                page_extraction_result = extract_and_reorganize_pages_safe(original_pdf_path, document_sections, lender_requirements)
+                page_extraction_result = extract_and_reorganize_pages_safe(original_pdf_path, document_sections)
                 print(f"🔍 DEBUG: Page extraction result: {type(page_extraction_result)}")
                 
                 if page_extraction_result:
