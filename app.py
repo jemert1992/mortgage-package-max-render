@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🏠 Enhanced Final Mortgage Package Processor Dashboard
-Complete end-to-end solution with all sections visible and functional
+🏠 Final Mortgage Package Processor Dashboard
+Complete end-to-end solution for mortgage package processing
 """
 
 import os
@@ -41,9 +41,9 @@ except Exception as e:
     print(f"❌ ERROR initializing OpenAI client: {e}")
     exit(1)
 
-print("🏠 Enhanced Final Mortgage Package Processor Dashboard - 2025-01-07")
+print("🏠 Final Mortgage Package Processor Dashboard - 2025-01-07")
 
-# Enhanced HTML template with all sections visible
+# Enhanced HTML template for the final dashboard
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -176,18 +176,17 @@ HTML_TEMPLATE = """
 
         .processing-steps {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
             margin-bottom: 3rem;
         }
 
         .step-card {
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             border-radius: var(--border-radius);
-            padding: 1.5rem;
+            padding: 2rem;
             border: 2px solid #e5e7eb;
             transition: var(--transition);
-            text-align: center;
         }
 
         .step-card.active {
@@ -212,7 +211,7 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            margin: 0 auto 1rem;
+            margin-bottom: 1rem;
         }
 
         .step-card.completed .step-number {
@@ -220,7 +219,7 @@ HTML_TEMPLATE = """
         }
 
         .step-title {
-            font-size: 1rem;
+            font-size: 1.25rem;
             font-weight: 600;
             color: #1f2937;
             margin-bottom: 0.5rem;
@@ -251,7 +250,7 @@ HTML_TEMPLATE = """
 
         .document-checklist {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1rem;
         }
 
@@ -288,7 +287,6 @@ HTML_TEMPLATE = """
         .document-name {
             font-weight: 500;
             color: #374151;
-            flex: 1;
         }
 
         .email-section {
@@ -324,57 +322,11 @@ HTML_TEMPLATE = """
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
 
-        .package-preview {
-            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
-            border-radius: var(--border-radius);
-            padding: 2rem;
-            margin-bottom: 2rem;
-            border: 2px solid #9ca3af;
-        }
-
-        .package-preview h3 {
-            color: #374151;
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .package-info {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .info-item {
-            background: white;
-            padding: 1rem;
-            border-radius: 8px;
-            border: 1px solid #d1d5db;
-        }
-
-        .info-label {
-            font-size: 0.875rem;
-            color: #6b7280;
-            font-weight: 500;
-            margin-bottom: 0.25rem;
-        }
-
-        .info-value {
-            font-size: 1rem;
-            color: #1f2937;
-            font-weight: 600;
-        }
-
         .action-buttons {
             display: flex;
             gap: 1rem;
             justify-content: center;
             flex-wrap: wrap;
-            margin-top: 2rem;
         }
 
         .btn {
@@ -390,8 +342,6 @@ HTML_TEMPLATE = """
             gap: 0.5rem;
             font-family: inherit;
             text-decoration: none;
-            min-width: 200px;
-            justify-content: center;
         }
 
         .btn-primary {
@@ -492,19 +442,11 @@ HTML_TEMPLATE = """
             }
             
             .processing-steps {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .document-checklist {
                 grid-template-columns: 1fr;
             }
             
             .action-buttons {
                 flex-direction: column;
-            }
-            
-            .btn {
-                min-width: auto;
             }
         }
     </style>
@@ -524,7 +466,7 @@ HTML_TEMPLATE = """
                 <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
                     <div class="upload-icon">📄</div>
                     <div class="upload-text">Upload Complete Mortgage Package</div>
-                    <div class="upload-subtext">Drag & drop your scanned mortgage package or click to browse (PDF files only)</div>
+                    <div class="upload-subtext">Drag & drop your scanned mortgage package or click to browse</div>
                     <input type="file" id="file-input" accept=".pdf" style="display: none;" onchange="handleFileUpload(event)">
                 </div>
             </div>
@@ -541,12 +483,12 @@ HTML_TEMPLATE = """
                     <div class="step-card" id="step-1">
                         <div class="step-number">1</div>
                         <div class="step-title">Scan Package</div>
-                        <div class="step-description">Finding funding instructions</div>
+                        <div class="step-description">Analyzing first pages for funding instructions</div>
                     </div>
                     <div class="step-card" id="step-2">
                         <div class="step-number">2</div>
                         <div class="step-title">Extract Requirements</div>
-                        <div class="step-description">Identifying document checklist</div>
+                        <div class="step-description">Identifying priority sections and document checklist</div>
                     </div>
                     <div class="step-card" id="step-3">
                         <div class="step-number">3</div>
@@ -556,7 +498,7 @@ HTML_TEMPLATE = """
                     <div class="step-card" id="step-4">
                         <div class="step-number">4</div>
                         <div class="step-title">Compile & Send</div>
-                        <div class="step-description">Generate and deliver package</div>
+                        <div class="step-description">Generate final package and deliver</div>
                     </div>
                 </div>
 
@@ -564,29 +506,6 @@ HTML_TEMPLATE = """
                 <div class="loading" id="processing-loading">
                     <div class="spinner"></div>
                     <div class="loading-text">Analyzing mortgage package...</div>
-                </div>
-
-                <!-- Package Preview -->
-                <div class="package-preview" id="package-preview" style="display: none;">
-                    <h3>📦 Package Information</h3>
-                    <div class="package-info">
-                        <div class="info-item">
-                            <div class="info-label">File Name</div>
-                            <div class="info-value" id="file-name">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">File Size</div>
-                            <div class="info-value" id="file-size">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Total Pages</div>
-                            <div class="info-value" id="total-pages">-</div>
-                        </div>
-                        <div class="info-item">
-                            <div class="info-label">Instructions Found</div>
-                            <div class="info-value" id="instructions-found">-</div>
-                        </div>
-                    </div>
                 </div>
 
                 <!-- Priority Sections -->
@@ -674,29 +593,12 @@ HTML_TEMPLATE = """
 
             uploadedFile = file;
             
-            // Update package preview
-            updatePackagePreview(file);
-            
             // Hide upload section and show processing
             document.getElementById('upload-section').style.display = 'none';
             document.getElementById('processing-section').style.display = 'block';
             
             // Start processing
             processPackage();
-        }
-
-        function updatePackagePreview(file) {
-            document.getElementById('file-name').textContent = file.name;
-            document.getElementById('file-size').textContent = formatFileSize(file.size);
-            document.getElementById('package-preview').style.display = 'block';
-        }
-
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
         async function processPackage() {
@@ -719,10 +621,6 @@ HTML_TEMPLATE = """
                 if (result.success) {
                     updateStep(1, 'completed');
                     updateStep(2, 'active');
-                    
-                    // Update package info
-                    document.getElementById('total-pages').textContent = result.total_pages || 'Unknown';
-                    document.getElementById('instructions-found').textContent = result.page_number ? `Page ${result.page_number}` : 'Not detected';
                     
                     // Step 2: Extract Requirements
                     extractedRequirements = result;
@@ -922,7 +820,7 @@ HTML_TEMPLATE = """
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             setupFileUpload();
-            console.log('🏠 Enhanced Mortgage Package Processor Dashboard Initialized');
+            console.log('🏠 Mortgage Package Processor Dashboard Initialized');
         });
     </script>
 </body>
@@ -975,18 +873,6 @@ class IntelligentMortgageProcessor:
                 pass
         
         return text_content
-
-    def get_pdf_info(self, pdf_path):
-        """Get basic PDF information"""
-        try:
-            with open(pdf_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                return {
-                    'total_pages': len(pdf_reader.pages),
-                    'file_size': os.path.getsize(pdf_path)
-                }
-        except:
-            return {'total_pages': 0, 'file_size': 0}
 
     def is_shipping_page(self, text_content):
         """Detect shipping/administrative pages"""
@@ -1061,8 +947,6 @@ class IntelligentMortgageProcessor:
     def analyze_package(self, pdf_path):
         """Main analysis function"""
         try:
-            pdf_info = self.get_pdf_info(pdf_path)
-            
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 total_pages = len(pdf_reader.pages)
@@ -1084,7 +968,6 @@ class IntelligentMortgageProcessor:
                         return {
                             'success': True,
                             'page_number': page_num + 1,
-                            'total_pages': total_pages,
                             'requirements': requirements,
                             'return_email': email_address,
                             'instruction_type': 'complete_package' if len(requirements) == 1 and 'Complete Package' in requirements[0] else 'detailed_checklist'
@@ -1093,8 +976,7 @@ class IntelligentMortgageProcessor:
                 # Fallback for image-based PDFs
                 return {
                     'success': True,
-                    'page_number': None,
-                    'total_pages': total_pages,
+                    'page_number': 1,
                     'requirements': [
                         "Closing Instructions (signed/dated)",
                         "Loan Application (1003)",
@@ -1160,6 +1042,9 @@ def compile_package():
         
         file = request.files['file']
         
+        # For now, return the original file with a professional cover page
+        # In a full implementation, this would reorganize based on requirements
+        
         # Create output filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"compiled_mortgage_package_{timestamp}.pdf"
@@ -1178,6 +1063,7 @@ def compile_package():
 def compile_and_send():
     """Compile package and send via email"""
     try:
+        # For demo purposes, we'll simulate email sending
         email_address = request.form.get('email')
         
         # In a real implementation, this would:
