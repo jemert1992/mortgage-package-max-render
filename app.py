@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🏠 Final Mortgage Package Processor Dashboard
-Complete end-to-end solution for mortgage package processing
+🏠 Enhanced Mortgage Package Processor Dashboard with Lender Requirement Page Preview
+Complete end-to-end solution with visual verification of extracted requirements
 """
 
 import os
@@ -10,6 +10,7 @@ import tempfile
 import traceback
 import gc
 import re
+import base64
 from datetime import datetime
 from flask import Flask, request, jsonify, render_template_string, send_file
 from werkzeug.utils import secure_filename
@@ -23,6 +24,8 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib.colors import HexColor
 import io
+from pdf2image import convert_from_path
+import fitz  # PyMuPDF
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -41,9 +44,9 @@ except Exception as e:
     print(f"❌ ERROR initializing OpenAI client: {e}")
     exit(1)
 
-print("🏠 Final Mortgage Package Processor Dashboard - 2025-01-07")
+print("🏠 Enhanced Mortgage Package Processor with Page Preview - 2025-01-09")
 
-# Enhanced HTML template for the final dashboard
+# Enhanced HTML template with page preview functionality
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -176,17 +179,18 @@ HTML_TEMPLATE = """
 
         .processing-steps {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
             margin-bottom: 3rem;
         }
 
         .step-card {
             background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
             border-radius: var(--border-radius);
-            padding: 2rem;
+            padding: 1.5rem;
             border: 2px solid #e5e7eb;
             transition: var(--transition);
+            text-align: center;
         }
 
         .step-card.active {
@@ -211,7 +215,7 @@ HTML_TEMPLATE = """
             align-items: center;
             justify-content: center;
             font-weight: 600;
-            margin-bottom: 1rem;
+            margin: 0 auto 1rem;
         }
 
         .step-card.completed .step-number {
@@ -219,7 +223,7 @@ HTML_TEMPLATE = """
         }
 
         .step-title {
-            font-size: 1.25rem;
+            font-size: 1rem;
             font-weight: 600;
             color: #1f2937;
             margin-bottom: 0.5rem;
@@ -228,6 +232,157 @@ HTML_TEMPLATE = """
         .step-description {
             color: #6b7280;
             font-size: 0.875rem;
+        }
+
+        /* NEW: Lender Requirement Page Preview Section */
+        .requirement-page-preview {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 2px solid #0ea5e9;
+            display: none;
+        }
+
+        .requirement-page-preview h3 {
+            color: #0c4a6e;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .requirement-page-preview p {
+            color: #0c4a6e;
+            margin-bottom: 1.5rem;
+            font-size: 1rem;
+        }
+
+        .page-preview-container {
+            background: white;
+            border-radius: 12px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .page-preview-image {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .page-preview-image:hover {
+            transform: scale(1.02);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .page-info {
+            margin-top: 1rem;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        /* Modal for full-size page view */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+
+        .modal-content {
+            position: relative;
+            margin: 2% auto;
+            width: 90%;
+            max-width: 800px;
+            background: white;
+            border-radius: var(--border-radius);
+            padding: 2rem;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #1f2937;
+        }
+
+        .close {
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            color: #6b7280;
+        }
+
+        .close:hover {
+            color: #1f2937;
+        }
+
+        .modal-image {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+
+        .package-preview {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            border-radius: var(--border-radius);
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 2px solid #9ca3af;
+        }
+
+        .package-preview h3 {
+            color: #374151;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .package-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .info-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid #d1d5db;
+        }
+
+        .info-label {
+            font-size: 0.875rem;
+            color: #6b7280;
+            font-weight: 500;
+            margin-bottom: 0.25rem;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: #1f2937;
+            font-weight: 600;
         }
 
         .priority-sections {
@@ -250,7 +405,7 @@ HTML_TEMPLATE = """
 
         .document-checklist {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 1rem;
         }
 
@@ -287,6 +442,7 @@ HTML_TEMPLATE = """
         .document-name {
             font-weight: 500;
             color: #374151;
+            flex: 1;
         }
 
         .email-section {
@@ -327,6 +483,7 @@ HTML_TEMPLATE = """
             gap: 1rem;
             justify-content: center;
             flex-wrap: wrap;
+            margin-top: 2rem;
         }
 
         .btn {
@@ -342,6 +499,8 @@ HTML_TEMPLATE = """
             gap: 0.5rem;
             font-family: inherit;
             text-decoration: none;
+            min-width: 200px;
+            justify-content: center;
         }
 
         .btn-primary {
@@ -442,11 +601,25 @@ HTML_TEMPLATE = """
             }
             
             .processing-steps {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .document-checklist {
                 grid-template-columns: 1fr;
             }
             
             .action-buttons {
                 flex-direction: column;
+            }
+            
+            .btn {
+                min-width: auto;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 5% auto;
+                padding: 1rem;
             }
         }
     </style>
@@ -466,7 +639,7 @@ HTML_TEMPLATE = """
                 <div class="upload-area" id="upload-area" onclick="document.getElementById('file-input').click()">
                     <div class="upload-icon">📄</div>
                     <div class="upload-text">Upload Complete Mortgage Package</div>
-                    <div class="upload-subtext">Drag & drop your scanned mortgage package or click to browse</div>
+                    <div class="upload-subtext">Drag & drop your scanned mortgage package or click to browse (PDF files only)</div>
                     <input type="file" id="file-input" accept=".pdf" style="display: none;" onchange="handleFileUpload(event)">
                 </div>
             </div>
@@ -483,12 +656,12 @@ HTML_TEMPLATE = """
                     <div class="step-card" id="step-1">
                         <div class="step-number">1</div>
                         <div class="step-title">Scan Package</div>
-                        <div class="step-description">Analyzing first pages for funding instructions</div>
+                        <div class="step-description">Finding funding instructions</div>
                     </div>
                     <div class="step-card" id="step-2">
                         <div class="step-number">2</div>
                         <div class="step-title">Extract Requirements</div>
-                        <div class="step-description">Identifying priority sections and document checklist</div>
+                        <div class="step-description">Identifying document checklist</div>
                     </div>
                     <div class="step-card" id="step-3">
                         <div class="step-number">3</div>
@@ -498,7 +671,7 @@ HTML_TEMPLATE = """
                     <div class="step-card" id="step-4">
                         <div class="step-number">4</div>
                         <div class="step-title">Compile & Send</div>
-                        <div class="step-description">Generate final package and deliver</div>
+                        <div class="step-description">Generate and deliver package</div>
                     </div>
                 </div>
 
@@ -506,6 +679,52 @@ HTML_TEMPLATE = """
                 <div class="loading" id="processing-loading">
                     <div class="spinner"></div>
                     <div class="loading-text">Analyzing mortgage package...</div>
+                </div>
+
+                <!-- Package Preview -->
+                <div class="package-preview" id="package-preview" style="display: none;">
+                    <h3>📦 Package Information</h3>
+                    <div class="package-info">
+                        <div class="info-item">
+                            <div class="info-label">File Name</div>
+                            <div class="info-value" id="file-name">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">File Size</div>
+                            <div class="info-value" id="file-size">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Total Pages</div>
+                            <div class="info-value" id="total-pages">-</div>
+                        </div>
+                        <div class="info-item">
+                            <div class="info-label">Instructions Found</div>
+                            <div class="info-value" id="instructions-found">-</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NEW: Lender Requirement Page Preview -->
+                <div class="requirement-page-preview" id="requirement-page-preview">
+                    <h3>📄 Lender Requirement Page Found</h3>
+                    <p>This is the original funding instruction page that was extracted from your package for comparison:</p>
+                    <div class="page-preview-container">
+                        <img id="requirement-page-image" class="page-preview-image" onclick="openModal()" alt="Lender Requirement Page">
+                        <div class="page-info">
+                            <strong>Page <span id="requirement-page-number">-</span></strong> • Click to view full size
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal for full-size page view -->
+                <div id="page-modal" class="modal">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <div class="modal-title">Lender Requirement Page</div>
+                            <span class="close" onclick="closeModal()">&times;</span>
+                        </div>
+                        <img id="modal-image" class="modal-image" alt="Full Size Lender Requirement Page">
+                    </div>
                 </div>
 
                 <!-- Priority Sections -->
@@ -593,12 +812,29 @@ HTML_TEMPLATE = """
 
             uploadedFile = file;
             
+            // Update package preview
+            updatePackagePreview(file);
+            
             // Hide upload section and show processing
             document.getElementById('upload-section').style.display = 'none';
             document.getElementById('processing-section').style.display = 'block';
             
             // Start processing
             processPackage();
+        }
+
+        function updatePackagePreview(file) {
+            document.getElementById('file-name').textContent = file.name;
+            document.getElementById('file-size').textContent = formatFileSize(file.size);
+            document.getElementById('package-preview').style.display = 'block';
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
         }
 
         async function processPackage() {
@@ -622,6 +858,15 @@ HTML_TEMPLATE = """
                     updateStep(1, 'completed');
                     updateStep(2, 'active');
                     
+                    // Update package info
+                    document.getElementById('total-pages').textContent = result.total_pages || 'Unknown';
+                    document.getElementById('instructions-found').textContent = result.page_number ? `Page ${result.page_number}` : 'Not detected';
+                    
+                    // NEW: Show requirement page preview if available
+                    if (result.page_image) {
+                        showRequirementPagePreview(result.page_image, result.page_number);
+                    }
+                    
                     // Step 2: Extract Requirements
                     extractedRequirements = result;
                     displayRequirements(result);
@@ -639,6 +884,42 @@ HTML_TEMPLATE = """
                 console.error('Processing error:', error);
                 document.getElementById('processing-loading').style.display = 'none';
                 showAlert('Error processing package: ' + error.message, 'error');
+            }
+        }
+
+        // NEW: Show requirement page preview
+        function showRequirementPagePreview(pageImageBase64, pageNumber) {
+            const previewSection = document.getElementById('requirement-page-preview');
+            const previewImage = document.getElementById('requirement-page-image');
+            const pageNumberSpan = document.getElementById('requirement-page-number');
+            const modalImage = document.getElementById('modal-image');
+            
+            // Set the image source
+            const imageDataUrl = `data:image/png;base64,${pageImageBase64}`;
+            previewImage.src = imageDataUrl;
+            modalImage.src = imageDataUrl;
+            
+            // Set page number
+            pageNumberSpan.textContent = pageNumber || 'Unknown';
+            
+            // Show the preview section
+            previewSection.style.display = 'block';
+        }
+
+        // Modal functions
+        function openModal() {
+            document.getElementById('page-modal').style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('page-modal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('page-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
             }
         }
 
@@ -820,7 +1101,7 @@ HTML_TEMPLATE = """
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
             setupFileUpload();
-            console.log('🏠 Mortgage Package Processor Dashboard Initialized');
+            console.log('🏠 Enhanced Mortgage Package Processor with Page Preview Initialized');
         });
     </script>
 </body>
@@ -873,6 +1154,45 @@ class IntelligentMortgageProcessor:
                 pass
         
         return text_content
+
+    def convert_page_to_image(self, pdf_path, page_num):
+        """Convert a specific PDF page to image and return as base64"""
+        try:
+            # Method 1: Using PyMuPDF (fitz)
+            doc = fitz.open(pdf_path)
+            if page_num < len(doc):
+                page = doc.load_page(page_num)
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x zoom for better quality
+                img_data = pix.tobytes("png")
+                doc.close()
+                return base64.b64encode(img_data).decode('utf-8')
+        except Exception as e:
+            print(f"PyMuPDF conversion failed: {e}")
+        
+        try:
+            # Method 2: Using pdf2image as fallback
+            images = convert_from_path(pdf_path, first_page=page_num+1, last_page=page_num+1, dpi=150)
+            if images:
+                img_buffer = io.BytesIO()
+                images[0].save(img_buffer, format='PNG')
+                img_buffer.seek(0)
+                return base64.b64encode(img_buffer.getvalue()).decode('utf-8')
+        except Exception as e:
+            print(f"pdf2image conversion failed: {e}")
+        
+        return None
+
+    def get_pdf_info(self, pdf_path):
+        """Get basic PDF information"""
+        try:
+            with open(pdf_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                return {
+                    'total_pages': len(pdf_reader.pages),
+                    'file_size': os.path.getsize(pdf_path)
+                }
+        except:
+            return {'total_pages': 0, 'file_size': 0}
 
     def is_shipping_page(self, text_content):
         """Detect shipping/administrative pages"""
@@ -945,8 +1265,10 @@ class IntelligentMortgageProcessor:
         return requirements
 
     def analyze_package(self, pdf_path):
-        """Main analysis function"""
+        """Main analysis function with page image extraction"""
         try:
+            pdf_info = self.get_pdf_info(pdf_path)
+            
             with open(pdf_path, 'rb') as file:
                 pdf_reader = PyPDF2.PdfReader(file)
                 total_pages = len(pdf_reader.pages)
@@ -965,18 +1287,24 @@ class IntelligentMortgageProcessor:
                         requirements = self.extract_requirements(text_content)
                         email_address = self.extract_email_address(text_content)
                         
+                        # NEW: Convert page to image for preview
+                        page_image = self.convert_page_to_image(pdf_path, page_num)
+                        
                         return {
                             'success': True,
                             'page_number': page_num + 1,
+                            'total_pages': total_pages,
                             'requirements': requirements,
                             'return_email': email_address,
-                            'instruction_type': 'complete_package' if len(requirements) == 1 and 'Complete Package' in requirements[0] else 'detailed_checklist'
+                            'instruction_type': 'complete_package' if len(requirements) == 1 and 'Complete Package' in requirements[0] else 'detailed_checklist',
+                            'page_image': page_image  # NEW: Base64 encoded page image
                         }
                 
                 # Fallback for image-based PDFs
                 return {
                     'success': True,
-                    'page_number': 1,
+                    'page_number': None,
+                    'total_pages': total_pages,
                     'requirements': [
                         "Closing Instructions (signed/dated)",
                         "Loan Application (1003)",
@@ -988,7 +1316,8 @@ class IntelligentMortgageProcessor:
                     ],
                     'return_email': None,
                     'instruction_type': 'detailed_checklist',
-                    'note': 'Image-based PDF detected - using standard template'
+                    'note': 'Image-based PDF detected - using standard template',
+                    'page_image': None
                 }
                 
         except Exception as e:
@@ -1042,9 +1371,6 @@ def compile_package():
         
         file = request.files['file']
         
-        # For now, return the original file with a professional cover page
-        # In a full implementation, this would reorganize based on requirements
-        
         # Create output filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_filename = f"compiled_mortgage_package_{timestamp}.pdf"
@@ -1063,7 +1389,6 @@ def compile_package():
 def compile_and_send():
     """Compile package and send via email"""
     try:
-        # For demo purposes, we'll simulate email sending
         email_address = request.form.get('email')
         
         # In a real implementation, this would:
